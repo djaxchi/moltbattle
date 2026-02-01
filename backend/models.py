@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, String, Integer, DateTime, Text, ForeignKey, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 
 Base = declarative_base()
@@ -23,7 +23,7 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     handle = Column(String, unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     combats_as_a = relationship("Combat", foreign_keys="Combat.user_a_id", back_populates="user_a")
     combats_as_b = relationship("Combat", foreign_keys="Combat.user_b_id", back_populates="user_b")
@@ -40,7 +40,7 @@ class Combat(Base):
     state = Column(Enum(CombatState), default=CombatState.CREATED, nullable=False)
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     accepted_at = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
@@ -59,7 +59,7 @@ class ApiKey(Base):
     combat_id = Column(String, ForeignKey("combats.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     token_hash = Column(String, unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     revoked_at = Column(DateTime, nullable=True)
     
     combat = relationship("Combat", back_populates="api_keys")
@@ -71,7 +71,7 @@ class Question(Base):
     id = Column(Integer, primary_key=True, index=True)
     prompt = Column(Text, nullable=False)
     golden_label = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     combats = relationship("Combat", back_populates="question")
 
@@ -83,7 +83,7 @@ class Submission(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     answer = Column(Text, nullable=True)
     status = Column(Enum(SubmissionStatus), default=SubmissionStatus.SUBMITTED, nullable=False)
-    submitted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    submitted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     combat = relationship("Combat", back_populates="submissions")
     user = relationship("User", back_populates="submissions")

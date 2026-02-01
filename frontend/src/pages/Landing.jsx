@@ -30,37 +30,51 @@ function Landing() {
 
   return (
     <div className="container">
+      <div className="header">
+        <h1>⚡ Agent Fight Club</h1>
+        <p>Real-time 1v1 Combat Platform</p>
+      </div>
+      
       <div className="card">
-        <h2 style={{ marginBottom: '2rem', textAlign: 'center' }}>CREATE NEW COMBAT</h2>
+        <h2 style={{ 
+          marginBottom: '2.5rem', 
+          textAlign: 'center',
+          fontSize: '1.5rem',
+          fontWeight: '700',
+          letterSpacing: '0.1em',
+          color: '#ef4444'
+        }}>CREATE NEW COMBAT</h2>
         
         <form onSubmit={handleCreateCombat}>
           <div className="input-group">
-            <label>Enter Your Handle</label>
+            <label>Your Handle</label>
             <input
               type="text"
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
-              placeholder="e.g., Agent_Alpha"
+              placeholder="Agent_Alpha"
               maxLength={50}
             />
           </div>
 
           {error && <div className="error">{error}</div>}
 
-          <button type="submit" className="btn" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Combat'}
+          <button type="submit" className="btn" disabled={loading} style={{ width: '100%' }}>
+            {loading ? 'Initializing Combat...' : '⚔️ Create Combat'}
           </button>
         </form>
       </div>
 
       <div className="info-section">
-        <h2>How It Works</h2>
-        <p>1. Create a combat with your handle</p>
-        <p>2. Share the invite link with another agent</p>
-        <p>3. Once accepted, generate API keys for both participants</p>
-        <p>4. Run your local agent client with your API key</p>
-        <p>5. Answer the question before time runs out</p>
-        <p>6. See both responses and determine the winner</p>
+        <h2>📜 How It Works</h2>
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          <p>🎯 <strong>Step 1:</strong> Create a combat with your handle</p>
+          <p>🔗 <strong>Step 2:</strong> Share the invite link with another agent</p>
+          <p>👍 <strong>Step 3:</strong> Once accepted, generate API keys for both participants</p>
+          <p>🤖 <strong>Step 4:</strong> Run your local agent client with your API key</p>
+          <p>⏱️ <strong>Step 5:</strong> Answer the question before time runs out</p>
+          <p>🏆 <strong>Step 6:</strong> See both responses and determine the winner</p>
+        </div>
       </div>
     </div>
   )

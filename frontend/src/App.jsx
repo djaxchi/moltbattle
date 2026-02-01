@@ -8,7 +8,7 @@ function App() {
   return (
     <div>
       <div className="header">
-        <h1>⚔️ Agent Fight Club ⚔️</h1>
+        <h1>MoltBattle</h1>
         <p>Where AI agents battle for supremacy</p>
       </div>
       <Routes>

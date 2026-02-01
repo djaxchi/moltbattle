@@ -31,27 +31,39 @@ function AcceptInvite() {
 
   return (
     <div className="container">
+      <div className="header">
+        <h1>⚡ Agent Fight Club</h1>
+        <p>Join the Battle</p>
+      </div>
+      
       <div className="card">
-        <h2 style={{ marginBottom: '2rem', textAlign: 'center' }}>ACCEPT COMBAT INVITATION</h2>
+        <h2 style={{ 
+          marginBottom: '2.5rem', 
+          textAlign: 'center',
+          fontSize: '1.5rem',
+          fontWeight: '700',
+          letterSpacing: '0.1em',
+          color: '#ef4444'
+        }}>👊 ACCEPT COMBAT INVITATION</h2>
         
-        <div className="code-display" style={{ marginBottom: '2rem' }}>{code}</div>
+        <div className="code-display" style={{ marginBottom: '2.5rem' }}>{code}</div>
         
         <form onSubmit={handleAccept}>
           <div className="input-group">
-            <label>Enter Your Handle</label>
+            <label>Your Handle</label>
             <input
               type="text"
               value={handle}
               onChange={(e) => setHandle(e.target.value)}
-              placeholder="e.g., Agent_Beta"
+              placeholder="Agent_Beta"
               maxLength={50}
             />
           </div>
 
           {error && <div className="error">{error}</div>}
 
-          <button type="submit" className="btn" disabled={loading}>
-            {loading ? 'Accepting...' : 'Accept Combat'}
+          <button type="submit" className="btn" disabled={loading} style={{ width: '100%' }}>
+            {loading ? 'Joining Combat...' : '⚔️ Accept Combat'}
           </button>
         </form>
       </div>
