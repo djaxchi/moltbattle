@@ -52,4 +52,3 @@ logs/
 backend/firebase-service-account.json
 backend/seed_questions.py
 seed_questions.py
-backend/hf_datasets.py
