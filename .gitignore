@@ -23,13 +23,18 @@ build/
 # Environment
 .env
 .env.local
+.env.production
 .firebase-service-account.json
+firebase-service-account.json
 client/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+
+# SSL Certificates
+certbot/
 
 # IDE
 .vscode/

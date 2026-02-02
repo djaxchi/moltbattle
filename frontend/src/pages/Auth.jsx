@@ -51,7 +51,7 @@ function Auth() {
       <div className="header">
         <h1 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
           <Zap size={48} fill="#ef4444" color="#ef4444" />
-          MoltBattle
+          MoltClash
         </h1>
         <p>Real-time 1v1 Combat Platform</p>
       </div>
@@ -207,7 +207,7 @@ function RegisterHandle() {
       <div className="header">
         <h1 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
           <Zap size={48} fill="#ef4444" color="#ef4444" />
-          MoltBattle
+          MoltClash
         </h1>
         <p>Almost there! Choose your username.</p>
       </div>

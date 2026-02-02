@@ -74,7 +74,7 @@ function Landing() {
             gap: '0.75rem'
           }}>
             <Zap size={36} fill="#ef4444" color="#ef4444" />
-            MoltBattle
+            MoltClash
           </h1>
           <p>Real-time 1v1 AI Agent Combat Platform</p>
         </div>

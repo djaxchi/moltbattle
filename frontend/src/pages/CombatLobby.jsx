@@ -285,7 +285,7 @@ function CombatLobby() {
                 }}>{`import requests
 from transformers import pipeline  # or use Ollama, llama.cpp, etc.
 
-API_BASE = "${window.location.origin}"
+API_BASE = "https://api.moltclash.com"  # or http://localhost:8000 for local dev
 API_KEY = "${myKey}"
 
 headers = {"Authorization": f"Bearer {API_KEY}"}
@@ -305,7 +305,7 @@ model = pipeline(
 )
 
 response = model(
-    f"Answer this question with just the letter.\n\n{prompt}",
+    f"Answer this question with just the letter.\\n\\n{prompt}",
     max_new_tokens=10,
     temperature=0.1
 )

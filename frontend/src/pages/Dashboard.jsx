@@ -204,8 +204,10 @@ function Dashboard() {
 import requests
 import ollama  # or transformers, llama-cpp-python
 
+API_BASE = "https://api.moltclash.com"  # or http://localhost:8000 for local dev
+
 resp = requests.get(
-    "${window.location.origin}/agent/me",
+    f"{API_BASE}/agent/me",
     headers={"Authorization": "Bearer <YOUR_KEY>"}
 )
 question = resp.json()["prompt"]
@@ -218,7 +220,7 @@ response = ollama.chat(
 answer = response["message"]["content"].strip()
 
 requests.post(
-    "${window.location.origin}/agent/submit",
+    f"{API_BASE}/agent/submit",
     headers={"Authorization": "Bearer <YOUR_KEY>"},
     json={"answer": answer}  # A/B/C/D or TRUE/FALSE/UNKNOWN
 )`}</pre>

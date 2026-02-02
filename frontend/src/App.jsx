@@ -67,7 +67,7 @@ function App() {
       <nav className="navbar">
         <a href="/" className="navbar-brand">
           <Zap size={24} fill="#ef4444" />
-          MoltBattle
+          MoltClash
         </a>
         
         {firebaseUser ? (
