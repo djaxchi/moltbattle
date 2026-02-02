@@ -24,6 +24,7 @@ build/
 .env
 .env.local
 .firebase-service-account.json
+client/
 
 # Database
 *.db

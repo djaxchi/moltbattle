@@ -148,4 +148,6 @@ class CombatResultResponse(BaseModel):
     userBUsername: str
     userACorrect: bool
     userBCorrect: bool
+    userAAnswer: Optional[str] = None  # What player A submitted
+    userBAnswer: Optional[str] = None  # What player B submitted
     correctAnswer: Optional[str] = None  # Revealed after combat ends

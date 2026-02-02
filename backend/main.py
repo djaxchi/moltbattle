@@ -184,8 +184,11 @@ async def register_user(
     if user:
         # User exists, update username if provided and different
         if request.username and request.username != user.username:
-            # Check if new username is taken
-            username_taken = db.query(User).filter(User.username == request.username).first()
+            # Check if new username is taken by another user
+            username_taken = db.query(User).filter(
+                User.username == request.username,
+                User.id != user.id
+            ).first()
             if username_taken:
                 raise HTTPException(status_code=400, detail="Username already taken")
             user.username = request.username
@@ -241,46 +244,6 @@ async def get_current_user(
     # If user doesn't exist, return 404 - they need to register with a username
     if not user:
         raise HTTPException(status_code=404, detail="User not found. Please register with a username.")
-    
-    return AuthUserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        wins=user.wins,
-        losses=user.losses,
-        draws=user.draws,
-        totalCombats=user.total_combats,
-        score=user.score,
-        rank=user.rank,
-        createdAt=user.created_at
-    )
-
-@app.post("/api/auth/register", response_model=AuthUserResponse)
-async def register_user(
-    request: RegisterRequest,
-    firebase_user: dict = Depends(get_current_firebase_user),
-    db: Session = Depends(get_db)
-):
-    """Create a new user with a chosen username."""
-    # Check if user already exists
-    existing = db.query(User).filter(User.firebase_uid == firebase_user["uid"]).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="User already registered")
-    
-    # Check if username is taken
-    username_taken = db.query(User).filter(User.username == request.username).first()
-    if username_taken:
-        raise HTTPException(status_code=400, detail="Username already taken")
-    
-    # Create new user
-    user = User(
-        firebase_uid=firebase_user["uid"],
-        email=firebase_user.get("email"),
-        username=request.username
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
     
     return AuthUserResponse(
         id=user.id,
@@ -955,11 +918,14 @@ def get_combat_result(code: str, db: Session = Depends(get_db)):
         combat_id_int = int(uuid.UUID(combat.id).int % (10**9))
         a_correct = sub_a and check_answer_correct_hashed(sub_a.answer, combat_question.answer_key_hash, combat.id)
         b_correct = sub_b and check_answer_correct_hashed(sub_b.answer, combat_question.answer_key_hash, combat.id)
-        # We can reveal the correct answer format (e.g., "TRUE", "A") but not the hash
-        # For security, we reconstruct from submissions or store it encrypted
-        # For now, we indicate the type of answer expected
+        # Reveal the actual correct answer by checking which choice matches the hash
         choices = json.loads(combat_question.choices_json)
-        correct_answer = f"One of: {', '.join(choices)}"
+        for choice in choices:
+            if check_answer_correct_hashed(choice, combat_question.answer_key_hash, combat.id):
+                correct_answer = choice
+                break
+        if not correct_answer:
+            correct_answer = f"One of: {', '.join(choices)}"
     else:
         # Legacy format
         golden_label = combat.question.golden_label if combat.question else ""
@@ -976,6 +942,8 @@ def get_combat_result(code: str, db: Session = Depends(get_db)):
         userBUsername=user_b.username if user_b else "unknown",
         userACorrect=bool(a_correct),
         userBCorrect=bool(b_correct),
+        userAAnswer=sub_a.answer if sub_a else None,
+        userBAnswer=sub_b.answer if sub_b else None,
         correctAnswer=correct_answer
     )
 

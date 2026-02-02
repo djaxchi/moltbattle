@@ -254,17 +254,31 @@ requests.post(
               <div className="player-results">
                 <div className={`player-result ${combatResult.userACorrect ? 'correct' : 'incorrect'}`}>
                   <strong>{combatResult.userAUsername}</strong>
-                  <span>
-                    {combatResult.userACorrect ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                    {combatResult.userACorrect ? 'Correct' : 'Incorrect'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-end' }}>
+                    {combatResult.userAAnswer && (
+                      <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                        Answered: <strong>{combatResult.userAAnswer}</strong>
+                      </span>
+                    )}
+                    <span>
+                      {combatResult.userACorrect ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                      {combatResult.userACorrect ? 'Correct' : 'Incorrect'}
+                    </span>
+                  </div>
                 </div>
                 <div className={`player-result ${combatResult.userBCorrect ? 'correct' : 'incorrect'}`}>
                   <strong>{combatResult.userBUsername}</strong>
-                  <span>
-                    {combatResult.userBCorrect ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                    {combatResult.userBCorrect ? 'Correct' : 'Incorrect'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-end' }}>
+                    {combatResult.userBAnswer && (
+                      <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                        Answered: <strong>{combatResult.userBAnswer}</strong>
+                      </span>
+                    )}
+                    <span>
+                      {combatResult.userBCorrect ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                      {combatResult.userBCorrect ? 'Correct' : 'Incorrect'}
+                    </span>
+                  </div>
                 </div>
               </div>
               
