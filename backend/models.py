@@ -9,6 +9,7 @@ Base = declarative_base()
 class CombatState(str, enum.Enum):
     CREATED = "CREATED"
     ACCEPTED = "ACCEPTED"
+    KEYS_ISSUED = "KEYS_ISSUED"  # Keys issued, waiting for both to be ready
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     EXPIRED = "EXPIRED"
@@ -22,13 +23,40 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    handle = Column(String, unique=True, index=True, nullable=False)
+    firebase_uid = Column(String, unique=True, index=True, nullable=True)  # Firebase user ID
+    email = Column(String, unique=True, index=True, nullable=True)  # User email from Firebase
+    username = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    
+    # Scoring fields
+    wins = Column(Integer, default=0, nullable=False)
+    losses = Column(Integer, default=0, nullable=False)
+    draws = Column(Integer, default=0, nullable=False)
+    total_combats = Column(Integer, default=0, nullable=False)
     
     combats_as_a = relationship("Combat", foreign_keys="Combat.user_a_id", back_populates="user_a")
     combats_as_b = relationship("Combat", foreign_keys="Combat.user_b_id", back_populates="user_b")
     api_keys = relationship("ApiKey", back_populates="user")
     submissions = relationship("Submission", back_populates="user")
+    
+    @property
+    def score(self):
+        """Calculate score: 3 points for win, 1 for draw, 0 for loss"""
+        return (self.wins * 3) + self.draws
+    
+    @property
+    def rank(self):
+        """Get rank tier based on wins"""
+        if self.wins >= 100:
+            return "Professional"
+        elif self.wins >= 50:
+            return "Diamond"
+        elif self.wins >= 25:
+            return "Gold"
+        elif self.wins >= 10:
+            return "Silver"
+        else:
+            return "Bronze"
 
 class Combat(Base):
     __tablename__ = "combats"
@@ -37,8 +65,11 @@ class Combat(Base):
     code = Column(String, unique=True, index=True, nullable=False)
     user_a_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user_b_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    winner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_draw = Column(Integer, default=0, nullable=False)  # 1 if draw, 0 otherwise
     state = Column(Enum(CombatState), default=CombatState.CREATED, nullable=False)
-    question_id = Column(Integer, ForeignKey("questions.id"), nullable=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=True)  # Legacy
+    question_mode = Column(String, default="formal_logic", nullable=False)  # formal_logic or argument_logic
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     accepted_at = Column(DateTime, nullable=True)
@@ -46,8 +77,13 @@ class Combat(Base):
     expires_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     
+    # Ready flags - both must be True before timer starts
+    user_a_ready = Column(Integer, default=0, nullable=False)  # 1 if ready, 0 otherwise
+    user_b_ready = Column(Integer, default=0, nullable=False)  # 1 if ready, 0 otherwise
+    
     user_a = relationship("User", foreign_keys=[user_a_id], back_populates="combats_as_a")
     user_b = relationship("User", foreign_keys=[user_b_id], back_populates="combats_as_b")
+    winner = relationship("User", foreign_keys=[winner_id])
     question = relationship("Question", back_populates="combats")
     api_keys = relationship("ApiKey", back_populates="combat")
     submissions = relationship("Submission", back_populates="combat")
@@ -87,3 +123,47 @@ class Submission(Base):
     
     combat = relationship("Combat", back_populates="submissions")
     user = relationship("User", back_populates="submissions")
+
+
+class CombatQuestion(Base):
+    """
+    Stores metadata about the question used in a combat.
+    The actual question data is fetched from HuggingFace, but we store
+    the reference and answer hash for verification.
+    """
+    __tablename__ = "combat_questions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    combat_id = Column(String, ForeignKey("combats.id"), unique=True, nullable=False)
+    
+    # Dataset reference
+    dataset = Column(String, nullable=False)  # e.g., "tasksource/proofwriter"
+    config = Column(String, nullable=False)   # e.g., "default"
+    split = Column(String, nullable=False)    # e.g., "validation"
+    row_offset = Column(Integer, nullable=False)  # Row index in the dataset
+    
+    # Question display data (what was shown to players)
+    prompt = Column(Text, nullable=False)
+    choices_json = Column(Text, nullable=False)  # JSON array of choices
+    
+    # Secure answer verification
+    answer_key_hash = Column(String, nullable=False)  # SHA256 of correct answer + salt
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    
+    combat = relationship("Combat", backref="combat_question")
+
+
+class TempApiKey(Base):
+    """
+    Temporary storage for plaintext API keys so both users can retrieve them.
+    Keys are deleted after both users retrieve them or after combat starts.
+    """
+    __tablename__ = "temp_api_keys"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    combat_id = Column(String, ForeignKey("combats.id"), unique=True, nullable=False)
+    key_a = Column(String, nullable=False)  # Plaintext key for user A
+    key_b = Column(String, nullable=False)  # Plaintext key for user B
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    expires_at = Column(DateTime, nullable=False)  # Auto-expire after 5 minutes

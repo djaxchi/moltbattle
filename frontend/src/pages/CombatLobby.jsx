@@ -1,21 +1,39 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCombatStatus, issueKeys } from '../api'
+import { getCombatStatus, issueKeys, getMyApiKey, markReady } from '../api'
+import { useAuth } from '../AuthContext'
+import { Swords, Users, Link, Key, Copy, AlertTriangle, CheckCircle, Clock, Loader } from 'lucide-react'
 
 function CombatLobby() {
   const { code } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [combat, setCombat] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [keys, setKeys] = useState(null)
   const [generatingKeys, setGeneratingKeys] = useState(false)
+  const [copied, setCopied] = useState('')
+  const [keyCopied, setKeyCopied] = useState(false)
+  const [myKey, setMyKey] = useState(null)
+  const [fetchingKey, setFetchingKey] = useState(false)
+  const [markingReady, setMarkingReady] = useState(false)
+  const [amReady, setAmReady] = useState(false)
 
   const fetchStatus = async () => {
     try {
       const data = await getCombatStatus(code)
       setCombat(data)
       
+      // Update my ready status based on combat data
+      if (user && data) {
+        if (user.username === data.userAUsername) {
+          setAmReady(data.userAReady)
+        } else if (user.username === data.userBUsername) {
+          setAmReady(data.userBReady)
+        }
+      }
+      
+      // Redirect to dashboard once combat is running
       if (data.state === 'RUNNING' || data.state === 'COMPLETED' || data.state === 'EXPIRED') {
         navigate(`/dashboard/${code}`)
       }
@@ -28,28 +46,82 @@ function CombatLobby() {
 
   useEffect(() => {
     fetchStatus()
-    const interval = setInterval(fetchStatus, 3000)
+    // Poll for updates
+    const interval = setInterval(fetchStatus, 2000)
     return () => clearInterval(interval)
-  }, [code])
+  }, [code, user])
 
   const handleGenerateKeys = async () => {
     setGeneratingKeys(true)
     setError('')
     try {
-      const data = await issueKeys(code)
-      setKeys(data)
+      await issueKeys(code)
+      // After generating, fetch my own key
+      await fetchMyKey()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to generate keys')
-      setGeneratingKeys(false)
+      // If keys were already issued, try to fetch my key
+      if (err.response?.status === 400 && err.response?.data?.detail?.includes('already issued')) {
+        fetchMyKey()
+      } else {
+        setError(err.response?.data?.detail || 'Failed to generate keys')
+        setGeneratingKeys(false)
+      }
     }
   }
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
+  
+  const fetchMyKey = async () => {
+    if (fetchingKey || myKey) return
+    
+    setFetchingKey(true)
+    setError('')
+    try {
+      const data = await getMyApiKey(code)
+      setMyKey(data.key)
+    } catch (err) {
+      if (err.response?.status !== 404) {
+        console.error('Failed to fetch key:', err)
+      }
+    } finally {
+      setFetchingKey(false)
+    }
   }
+  
+  // Auto-fetch my key when combat becomes KEYS_ISSUED
+  useEffect(() => {
+    if (combat?.state === 'KEYS_ISSUED' && !myKey && !fetchingKey) {
+      fetchMyKey()
+    }
+  }, [combat?.state, myKey])
+
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text)
+    setCopied(label)
+    setTimeout(() => setCopied(''), 2000)
+    setKeyCopied(true)
+  }
+  
+  const handleReadyClick = async () => {
+    setMarkingReady(true)
+    setError('')
+    try {
+      const result = await markReady(code)
+      setAmReady(true)
+      // If both are ready, we'll get redirected by the polling
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to mark as ready')
+    } finally {
+      setMarkingReady(false)
+    }
+  }
+  
+  // Determine if current user is player A or B  
+  const isPlayerA = user && combat && user.username === combat.userAUsername
+  const isPlayerB = user && combat && user.username === combat.userBUsername
+  const opponentReady = isPlayerA ? combat?.userBReady : combat?.userAReady
+  const opponentUsername = isPlayerA ? combat?.userBUsername : combat?.userAUsername
 
   if (loading) {
-    return <div className="container"><div className="loading">Loading combat...</div></div>
+    return <div className="container"><div className="loading">Loading combat</div></div>
   }
 
   if (error && !combat) {
@@ -59,149 +131,246 @@ function CombatLobby() {
   const inviteUrl = `${window.location.origin}/accept/${code}`
 
   return (
-    <div className="container">
-      <div className="card">
-        <h2 style={{ 
-          marginBottom: '1.5rem',
-          fontSize: '1.75rem',
-          fontWeight: '700',
-          letterSpacing: '0.1em',
-          color: '#ef4444'
-        }}>🏰 COMBAT LOBBY</h2>
+    <div className="container fade-in">
+      <div className="card lobby-card">
+        <h2 className="page-title" style={{ justifyContent: 'center' }}>
+          <Swords size={28} />
+          COMBAT LOBBY
+        </h2>
         
-        <div className="status-badge">{combat.state}</div>
+        <div className="lobby-status">
+          <span className={`status-badge ${combat.state.toLowerCase()}`}>{combat.state}</span>
+          <div className="lobby-code">{code}</div>
+        </div>
         
-        <div className="code-display">{code}</div>
-        
-        <div style={{ 
-          marginTop: '2.5rem',
-          padding: '1.5rem',
-          background: 'rgba(0, 0, 0, 0.3)',
-          borderRadius: '12px',
-          border: '1px solid rgba(239, 68, 68, 0.2)'
-        }}>
-          <h3 style={{ 
-            marginBottom: '1.25rem',
-            fontSize: '1.1rem',
-            fontWeight: '700',
-            letterSpacing: '0.05em',
-            color: '#ef4444'
-          }}>👥 PARTICIPANTS</h3>
-          <p style={{ marginBottom: '0.75rem', fontSize: '1rem' }}>
-            <strong style={{ color: '#f3f4f6' }}>Player A:</strong> 
-            <span style={{ marginLeft: '0.5rem', color: '#d1d5db' }}>{combat.userAHandle || 'Unknown'}</span>
-          </p>
-          <p style={{ fontSize: '1rem' }}>
-            <strong style={{ color: '#f3f4f6' }}>Player B:</strong> 
-            <span style={{ marginLeft: '0.5rem', color: combat.userBHandle ? '#d1d5db' : '#9ca3af' }}>
-              {combat.userBHandle || 'Waiting...'}
-            </span>
-          </p>
+        {/* Participants */}
+        <div className="lobby-section">
+          <h3 className="section-header">
+            <Users size={18} />
+            Participants
+          </h3>
+          <div className="participants-list">
+            <div className="participant-row">
+              <span className="participant-label">Player A</span>
+              <span className="participant-name">
+                {combat.userAUsername || 'Unknown'}
+                {combat.state === 'KEYS_ISSUED' && combat.userAReady && (
+                  <CheckCircle size={14} style={{ marginLeft: '0.5rem', color: 'var(--color-success)' }} />
+                )}
+              </span>
+            </div>
+            <div className="participant-row">
+              <span className="participant-label">Player B</span>
+              <span className={`participant-name ${!combat.userBUsername ? 'waiting' : ''}`}>
+                {combat.userBUsername || 'Waiting...'}
+                {combat.state === 'KEYS_ISSUED' && combat.userBReady && (
+                  <CheckCircle size={14} style={{ marginLeft: '0.5rem', color: 'var(--color-success)' }} />
+                )}
+              </span>
+            </div>
+          </div>
         </div>
 
+        {/* Invite Link */}
         {combat.state === 'CREATED' && (
-          <div style={{ marginTop: '2.5rem' }}>
-            <h3 style={{ 
-              marginBottom: '1.25rem',
-              fontSize: '1.1rem',
-              fontWeight: '700',
-              letterSpacing: '0.05em',
-              color: '#ef4444'
-            }}>🔗 INVITE LINK</h3>
-            <div className="invite-link">{inviteUrl}</div>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => copyToClipboard(inviteUrl)}
-              style={{ marginTop: '1rem', width: '100%' }}
-            >
-              📋 Copy Invite Link
-            </button>
+          <div className="lobby-section">
+            <h3 className="section-header">
+              <Link size={18} />
+              Invite Link
+            </h3>
+            <div className="invite-box">
+              <input type="text" value={inviteUrl} readOnly />
+              <button 
+                className="icon-btn" 
+                onClick={() => copyToClipboard(inviteUrl, 'invite')}
+                title="Copy invite link"
+              >
+                {copied === 'invite' ? <CheckCircle size={18} /> : <Copy size={18} />}
+              </button>
+            </div>
           </div>
         )}
 
-        {combat.state === 'ACCEPTED' && !keys && (
-          <div style={{ marginTop: '2.5rem' }}>
-            <p style={{ 
-              marginBottom: '1.5rem', 
-              fontSize: '1.1rem', 
-              color: '#d1d5db',
-              textAlign: 'center'
-            }}>✅ Both players ready! Generate API keys to start the combat.</p>
+        {/* Generate Keys */}
+        {combat.state === 'ACCEPTED' && !myKey && (
+          <div className="lobby-section text-center">
+            <div className="success" style={{ marginBottom: '1.5rem' }}>
+              <CheckCircle size={18} style={{ marginRight: '0.5rem' }} />
+              Both players ready! Generate API keys to start the combat.
+            </div>
             <button 
-              className="btn" 
+              className="btn btn-full" 
               onClick={handleGenerateKeys}
               disabled={generatingKeys}
-              style={{ width: '100%' }}
             >
-              {generatingKeys ? 'Generating Keys...' : '🔑 Generate API Keys & Start Combat'}
+              <Key size={18} />
+              {generatingKeys ? 'Generating Keys...' : 'Generate API Keys'}
             </button>
           </div>
         )}
 
-        {keys && (
-          <div style={{ marginTop: '2.5rem' }}>
-            <div className="error" style={{ 
-              background: 'rgba(220, 38, 38, 0.2)',
-              backdropFilter: 'blur(10px)',
-              border: '2px solid #ef4444',
-              fontSize: '1rem',
-              fontWeight: '600'
-            }}>
-              ⚠️ IMPORTANT: Copy these keys now! They will not be shown again.
+        {/* My Key Display - Show only my key */}
+        {myKey && (
+          <div className="lobby-section">
+            <div className="success" style={{ marginBottom: '1.5rem' }}>
+              <CheckCircle size={18} style={{ marginRight: '0.5rem' }} />
+              Your API key is ready!
             </div>
             
-            <div className="key-display">
-              <span className="key-label">🔑 Player A ({combat.userAHandle}) API Key:</span>
-              <div style={{ 
-                fontFamily: 'Monaco, monospace', 
-                fontSize: '0.85rem',
-                wordBreak: 'break-all',
-                marginBottom: '1rem',
-                padding: '1rem',
-                background: 'rgba(0, 0, 0, 0.4)',
-                borderRadius: '8px'
-              }}>
-                {keys.keyA}
+            <div className="key-card">
+              <div className="key-header">
+                <Key size={16} />
+                Your API Key
               </div>
+              <div className="api-key-box">{myKey}</div>
               <button 
-                className="btn btn-secondary" 
-                onClick={() => copyToClipboard(keys.keyA)}
-                style={{ width: '100%' }}
+                className="btn btn-secondary btn-full btn-sm"
+                onClick={() => copyToClipboard(myKey, 'myKey')}
               >
-                📋 Copy Key A
+                {copied === 'myKey' ? <CheckCircle size={16} /> : <Copy size={16} />}
+                {copied === 'myKey' ? 'Copied!' : 'Copy Your Key'}
               </button>
             </div>
-
-            <div className="key-display">
-              <span className="key-label">🔑 Player B ({combat.userBHandle}) API Key:</span>
-              <div style={{ 
-                fontFamily: 'Monaco, monospace', 
-                fontSize: '0.85rem',
-                wordBreak: 'break-all',
-                marginBottom: '1rem',
+            
+            {/* API Documentation */}
+            <div className="api-docs" style={{ marginTop: '1.5rem' }}>
+              <h4 style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Key size={16} />
+                API Usage
+              </h4>
+              
+              <div className="api-endpoint" style={{ 
+                background: 'rgba(0,0,0,0.3)', 
+                borderRadius: '0.5rem', 
                 padding: '1rem',
-                background: 'rgba(0, 0, 0, 0.4)',
-                borderRadius: '8px'
+                marginBottom: '1rem',
+                fontSize: '0.85rem'
               }}>
-                {keys.keyB}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <strong style={{ color: '#22c55e' }}>GET</strong>{' '}
+                  <code style={{ color: '#a5b4fc' }}>/agent/me</code>
+                  <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>- Get the question</span>
+                </div>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <strong style={{ color: '#f59e0b' }}>POST</strong>{' '}
+                  <code style={{ color: '#a5b4fc' }}>/agent/submit</code>
+                  <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>- Submit your answer</span>
+                </div>
+                <div>
+                  <strong style={{ color: '#3b82f6' }}>Header</strong>{' '}
+                  <code style={{ color: '#fbbf24' }}>Authorization: Bearer {'<your-key>'}</code>
+                </div>
               </div>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => copyToClipboard(keys.keyB)}
-                style={{ width: '100%' }}
-              >
-                📋 Copy Key B
-              </button>
+              
+              <details style={{ 
+                background: 'rgba(0,0,0,0.2)', 
+                borderRadius: '0.5rem',
+                border: '1px solid rgba(255,255,255,0.1)'
+              }}>
+                <summary style={{ 
+                  padding: '0.75rem 1rem', 
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  color: '#a5b4fc'
+                }}>
+                  Example Python Agent Code (Local Model)
+                </summary>
+                <pre style={{ 
+                  padding: '1rem',
+                  margin: 0,
+                  overflow: 'auto',
+                  fontSize: '0.75rem',
+                  lineHeight: '1.5',
+                  color: '#e5e7eb'
+                }}>{`import requests
+from transformers import pipeline  # or use Ollama, llama.cpp, etc.
+
+API_BASE = "${window.location.origin}"
+API_KEY = "${myKey}"
+
+headers = {"Authorization": f"Bearer {API_KEY}"}
+
+# 1. Get the question
+resp = requests.get(f"{API_BASE}/agent/me", headers=headers)
+data = resp.json()
+prompt = data["prompt"]
+choices = data.get("choices", [])
+
+# 2. Load your local model (example with HuggingFace)
+# Alternative: use Ollama with ollama.chat() or llama-cpp-python
+model = pipeline(
+    "text-generation",
+    model="meta-llama/Llama-2-7b-chat-hf",  # your local model
+    device_map="auto"
+)
+
+response = model(
+    f"Answer this question with just the letter.\n\n{prompt}",
+    max_new_tokens=10,
+    temperature=0.1
+)
+answer = response[0]["generated_text"].strip().upper()
+
+# 3. Submit answer (A/B/C/D or TRUE/FALSE/UNKNOWN)
+resp = requests.post(
+    f"{API_BASE}/agent/submit",
+    headers=headers,
+    json={"answer": answer}
+)
+print(resp.json())`}</pre>
+              </details>
             </div>
 
-            <p style={{ 
-              marginTop: '1.5rem', 
-              textAlign: 'center',
-              color: '#9ca3af',
-              fontSize: '1rem'
-            }}>
-              ⏳ Redirecting to dashboard...
-            </p>
+            {keyCopied && !amReady && (
+              <button 
+                className="btn btn-full"
+                onClick={handleReadyClick}
+                disabled={markingReady}
+                style={{ marginTop: '1rem' }}
+              >
+                {markingReady ? (
+                  <>
+                    <Loader size={18} className="spin" />
+                    Marking Ready...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={18} />
+                    I'm Ready - Go to Dashboard
+                  </>
+                )}
+              </button>
+            )}
+            
+            {keyCopied && amReady && !opponentReady && (
+              <div className="waiting-opponent" style={{ marginTop: '1rem', textAlign: 'center' }}>
+                <div className="waiting-box" style={{ 
+                  background: 'rgba(59, 130, 246, 0.1)', 
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '0.5rem',
+                  padding: '1.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.75rem'
+                }}>
+                  <Loader size={24} className="spin" style={{ color: '#3b82f6' }} />
+                  <span style={{ color: '#3b82f6', fontWeight: '600' }}>
+                    Waiting for {opponentUsername} to be ready...
+                  </span>
+                  <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
+                    The timer will start once both players click "Ready"
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {!keyCopied && (
+              <p className="copy-warning">
+                <AlertTriangle size={16} />
+                Copy your key before continuing
+              </p>
+            )}
           </div>
         )}
 

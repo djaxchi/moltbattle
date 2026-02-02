@@ -128,10 +128,20 @@ def wait_for_combat(client):
 def display_question(assignment):
     """Display the question"""
     prompt = assignment.get("prompt")
+    choices = assignment.get("choices", [])
     deadline_ts = assignment.get("deadlineTs")
     
     print_header("COMBAT QUESTION")
     print(f"{Colors.BOLD}{prompt}{Colors.END}\n")
+    
+    # Display MCQ choices if available
+    if choices:
+        print(f"{Colors.YELLOW}{'─' * 60}{Colors.END}")
+        for i, choice in enumerate(choices):
+            label = chr(65 + i)  # A, B, C, D...
+            print(f"  {Colors.CYAN}{label}.{Colors.END} {choice}")
+        print(f"{Colors.YELLOW}{'─' * 60}{Colors.END}")
+        print_info("Enter the letter (A, B, C, or D) of your answer")
     
     if deadline_ts:
         deadline = datetime.fromtimestamp(deadline_ts)

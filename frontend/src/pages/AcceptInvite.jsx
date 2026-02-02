@@ -1,26 +1,21 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { acceptCombat } from '../api'
+import { useAuth } from '../AuthContext'
+import { Swords, ArrowLeft, UserCheck } from 'lucide-react'
 
 function AcceptInvite() {
   const { code } = useParams()
   const navigate = useNavigate()
-  const [handle, setHandle] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const { user } = useAuth()
 
-  const handleAccept = async (e) => {
-    e.preventDefault()
+  const handleAccept = async () => {
     setError('')
-    
-    if (!handle.trim()) {
-      setError('Please enter a handle')
-      return
-    }
-
     setLoading(true)
     try {
-      await acceptCombat(code, handle.trim())
+      await acceptCombat(code)
       navigate(`/lobby/${code}`)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to accept combat')
@@ -30,42 +25,45 @@ function AcceptInvite() {
   }
 
   return (
-    <div className="container">
-      <div className="header">
-        <h1>⚡ Agent Fight Club</h1>
-        <p>Join the Battle</p>
-      </div>
-      
-      <div className="card">
-        <h2 style={{ 
-          marginBottom: '2.5rem', 
-          textAlign: 'center',
-          fontSize: '1.5rem',
-          fontWeight: '700',
-          letterSpacing: '0.1em',
-          color: '#ef4444'
-        }}>👊 ACCEPT COMBAT INVITATION</h2>
+    <div className="container fade-in">
+      <div className="card invite-card">
+        <h2 className="page-title" style={{ justifyContent: 'center' }}>
+          <Swords size={28} />
+          ACCEPT COMBAT
+        </h2>
         
-        <div className="code-display" style={{ marginBottom: '2.5rem' }}>{code}</div>
+        <div className="invite-code">{code}</div>
         
-        <form onSubmit={handleAccept}>
-          <div className="input-group">
-            <label>Your Handle</label>
-            <input
-              type="text"
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
-              placeholder="Agent_Beta"
-              maxLength={50}
-            />
-          </div>
+        <p className="invite-message">
+          You've been challenged to a combat! Ready to fight as 
+          <strong className="invite-handle">{user?.username}</strong>?
+        </p>
 
-          {error && <div className="error">{error}</div>}
+        {error && <div className="error">{error}</div>}
 
-          <button type="submit" className="btn" disabled={loading} style={{ width: '100%' }}>
-            {loading ? 'Joining Combat...' : '⚔️ Accept Combat'}
-          </button>
-        </form>
+        <button 
+          onClick={handleAccept} 
+          className="btn btn-full" 
+          disabled={loading}
+        >
+          {loading ? (
+            'Joining Combat...'
+          ) : (
+            <>
+              <UserCheck size={18} />
+              Accept Combat
+            </>
+          )}
+        </button>
+
+        <button 
+          onClick={() => navigate('/')} 
+          className="btn btn-secondary btn-full"
+          style={{ marginTop: '0.75rem' }}
+        >
+          <ArrowLeft size={18} />
+          Back to Home
+        </button>
       </div>
     </div>
   )
