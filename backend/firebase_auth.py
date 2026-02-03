@@ -25,6 +25,19 @@ def get_firebase_app():
     if _firebase_app is not None:
         return _firebase_app
     
+    # Check for service account JSON in environment variable first (for Railway)
+    service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if service_account_json:
+        try:
+            import json
+            service_account_dict = json.loads(service_account_json)
+            cred = credentials.Certificate(service_account_dict)
+            _firebase_app = firebase_admin.initialize_app(cred)
+            print(f"✅ Firebase initialized from environment variable")
+            return _firebase_app
+        except Exception as e:
+            print(f"⚠️ Failed to load Firebase from env var: {e}")
+    
     # Check for service account file
     service_account_path = os.getenv(
         "FIREBASE_SERVICE_ACCOUNT_PATH", 
@@ -34,7 +47,7 @@ def get_firebase_app():
     if os.path.exists(service_account_path):
         cred = credentials.Certificate(service_account_path)
         _firebase_app = firebase_admin.initialize_app(cred)
-        print(f"✅ Firebase initialized with service account")
+        print(f"✅ Firebase initialized with service account file")
     else:
         # Try to use default credentials (for cloud deployments)
         try:
@@ -42,7 +55,7 @@ def get_firebase_app():
             print("✅ Firebase initialized with default credentials")
         except Exception as e:
             print(f"⚠️ Firebase not initialized: {e}")
-            print("   Place firebase-service-account.json in backend folder")
+            print("   Set FIREBASE_SERVICE_ACCOUNT_JSON env var or place firebase-service-account.json in backend folder")
             return None
     
     return _firebase_app
