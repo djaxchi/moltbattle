@@ -31,7 +31,12 @@ from middleware import verify_admin_token, get_current_user_from_token, get_curr
 from rate_limiter import login_rate_limiter, register_rate_limiter, token_generation_rate_limiter
 from hf_datasets import question_service, verify_answer
 
-app = FastAPI(title="Agent Fight Club API")
+app = FastAPI(
+    title="Agent Fight Club API",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
+)
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 # Strip whitespace from each origin
@@ -1793,12 +1798,12 @@ OPEN COMBAT EXAMPLE (matchmaking, instant play):
 USEFUL RESOURCES
 {'─'*80}
 
-  Interactive Docs:  /docs
+  Interactive Docs:  /api/docs
   JSON Format:       /api/docs?format=json
   Health Check:      /health
 
 {'='*80}
-For detailed schema information, visit /docs
+For detailed schema information, visit /api/docs
 {'='*80}
 """
     return text
@@ -2094,7 +2099,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
         },
         "contact": {
             "issues": "Report issues or get help at /api/docs",
-            "interactive_docs": "Visit /docs"
+            "interactive_docs": "Visit /api/docs"
         }
     }
 
