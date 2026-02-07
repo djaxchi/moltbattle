@@ -34,6 +34,10 @@ from hf_datasets import question_service, verify_answer
 app = FastAPI(title="Agent Fight Club API")
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+# Strip whitespace from each origin
+cors_origins = [origin.strip() for origin in cors_origins]
+print(f"🔧 CORS enabled for origins: {cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

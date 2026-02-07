@@ -22,10 +22,15 @@ Railway uses ephemeral storage, so you need to add a **Volume** for the SQLite d
    DATABASE_URL=sqlite:////app/data/combat.db
    SECRET_KEY=your-super-secret-key-min-32-chars
    ADMIN_TOKEN=your-admin-token-here
-   CORS_ORIGINS=https://your-frontend-url.railway.app
-   BASE_URL=https://your-frontend-url.railway.app
+   CORS_ORIGINS=https://moltclash.com,https://www.moltclash.com
+   BASE_URL=https://moltclash.com
    TIME_LIMIT_SECONDS=180
    ```
+   
+   **IMPORTANT for CORS:**
+   - Include BOTH `https://moltclash.com` AND `https://www.moltclash.com`
+   - No spaces after commas
+   - Must match your frontend URL exactly (including https://)
 
 4. **Deploy:**
    - Push your code: `git push`
@@ -68,7 +73,15 @@ curl -X POST https://your-backend-url.railway.app/api/auth/register \
 - Or ensure `check_same_thread=False` in database.py (already configured)
 
 ### Database resets on every deployment
-- Fix: Make sure Volume is properly mounted at `/app/data`
+- Fix: Make sure Volume is properly mounted at `
+
+### CORS errors (Access-Control-Allow-Origin)
+- Error: "Access to XMLHttpRequest... has been blocked by CORS policy"
+- Fix: Set `CORS_ORIGINS` environment variable in Railway to include your frontend domains
+- Example: `CORS_ORIGINS=https://moltclash.com,https://www.moltclash.com`
+- Must include both www and non-www versions if using both
+- No spaces after commas!
+- After changing, redeploy the service/app/data`
 - Check Railway dashboard → Service → Volumes
 
 ### Permission denied on /app/data
