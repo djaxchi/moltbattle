@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
+from contextlib import asynccontextmanager
 import uuid
 import os
 import random
@@ -31,11 +32,32 @@ from middleware import verify_admin_token, get_current_user_from_token, get_curr
 from rate_limiter import login_rate_limiter, register_rate_limiter, token_generation_rate_limiter
 from hf_datasets import question_service, verify_answer
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown"""
+    # Startup: Initialize database only if it doesn't exist
+    from database import init_database, DATABASE_URL
+    import os
+    
+    db_exists = False
+    if "sqlite" in DATABASE_URL:
+        db_path = DATABASE_URL.replace("sqlite:///", "")
+        db_exists = os.path.exists(db_path)
+    
+    if not db_exists:
+        init_database()
+    else:
+        print("✅ Database already exists - skipping initialization")
+    
+    yield
+    # Shutdown: cleanup if needed
+
 app = FastAPI(
     title="Agent Fight Club API",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan
 )
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
@@ -234,11 +256,6 @@ def determine_winner_and_update_stats(combat: Combat, db: Session):
 # ============================================================================
 # AUTH API
 # ============================================================================
-
-# ============================================================================
-# AUTH API
-# ============================================================================
-
 @app.post("/api/auth/register", response_model=LoginResponse)
 async def register_user(
     request: RegisterRequest,
@@ -602,7 +619,7 @@ async def create_combat(
     
     # If it's an open combat, we need to assign questions immediately
     if request.is_open:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         combat = Combat(
             id=combat_id,
             code=code,
@@ -660,7 +677,7 @@ async def create_combat(
             combat_id=combat.id,
             key_a=token_a,
             key_b="",  # Will be generated when user B joins
-            expires_at=datetime.utcnow() + timedelta(hours=24)  # Extended expiry for open combats
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24)  # Extended expiry for open combats
         )
         db.add(temp_keys)
         
@@ -706,7 +723,7 @@ async def accept_combat(
     
     combat.user_b_id = user.id
     combat.state = CombatState.ACCEPTED
-    combat.accepted_at = datetime.utcnow()
+    combat.accepted_at = datetime.now(timezone.utc)
     db.commit()
     
     return AcceptCombatResponse(
@@ -723,7 +740,7 @@ async def join_open_combat(
     """Join an available open combat (matchmaking)"""
     
     # Find an open combat that user didn't create
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     open_combat = db.query(Combat).filter(
         Combat.is_open == 1,
         Combat.state.in_([CombatState.RUNNING, CombatState.OPEN]),  # Can join while User A is playing or after they submit
@@ -753,7 +770,7 @@ async def join_open_combat(
         temp_keys.key_b = token_b
     
     # User B joins - set their individual timer
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     open_combat.state = CombatState.RUNNING
     open_combat.accepted_at = now
     open_combat.user_b_started_at = now  # Individual timer for User B
@@ -789,7 +806,7 @@ def get_combat_status(
     current_user = None
     
     # Check for expiration - for online combats, check individual timers
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if combat.is_open and combat.state == CombatState.RUNNING:
         # Check individual timers for online combats
         user_a_expired = combat.user_a_expires_at and now > combat.user_a_expires_at
@@ -945,17 +962,17 @@ def issue_api_keys(code: str, db: Session = Depends(get_db)):
         question = random.choice(questions)
         combat.question_id = question.id
     
-    # Start combat
+    # Start combat (deprecated - keys issued but timer starts when each user is ready)
     combat.state = CombatState.RUNNING
-    combat.started_at = datetime.utcnow()
-    combat.expires_at = datetime.utcnow() + timedelta(seconds=TIME_LIMIT_SECONDS)
+    combat.started_at = datetime.now(timezone.utc)
+    combat.expires_at = datetime.now(timezone.utc) + timedelta(seconds=TIME_LIMIT_SECONDS)
     
     # Store temporary plaintext keys for retrieval by both users
     temp_keys = TempApiKey(
         combat_id=combat.id,
         key_a=token_a,
         key_b=token_b,
-        expires_at=datetime.utcnow() + timedelta(minutes=5)  # Keys expire in 5 minutes
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5)  # Keys expire in 5 minutes
     )
     db.add(temp_keys)
     
@@ -976,32 +993,44 @@ def mark_user_ready(
     user: User = Depends(get_current_user_from_api_token),
     db: Session = Depends(get_db)
 ):
-    """Mark user as ready to start the combat. Timer starts when both are ready."""
+    """Mark user as ready to start versus combat. Each user's timer starts independently when they mark ready. Only for versus combats - online combats start automatically."""
     combat = db.query(Combat).filter(Combat.code == code).first()
     if not combat:
         raise HTTPException(status_code=404, detail="Combat not found")
     
-    if combat.state not in [CombatState.KEYS_ISSUED, CombatState.RUNNING]:
+    # Online/open combats don't use ready mechanism - they start immediately
+    if combat.is_open:
+        raise HTTPException(status_code=400, detail="Online combats don't require ready status. Your timer already started when you received your key.")
+    
+    if combat.state != CombatState.KEYS_ISSUED:
         raise HTTPException(status_code=400, detail="Combat is not in ready state")
     
-    # Mark the appropriate user as ready
-    if user.id == combat.user_a_id:
-        combat.user_a_ready = 1
-    elif user.id == combat.user_b_id:
-        combat.user_b_ready = 1
-    else:
+    # Verify user is a participant
+    if user.id != combat.user_a_id and user.id != combat.user_b_id:
         raise HTTPException(status_code=403, detail="Not a participant in this combat")
     
-    # For open combats, user A can start immediately
-    if combat.is_open and user.id == combat.user_a_id and combat.state == CombatState.KEYS_ISSUED:
-        # User A starts immediately, no timer needed for them
-        # They just answer and submit at their own pace
-        pass  # State stays KEYS_ISSUED until they submit
-    # If both are ready (normal combats), start the timer
-    elif combat.user_a_ready and combat.user_b_ready and combat.state == CombatState.KEYS_ISSUED:
+    # Mark the appropriate user as ready and start their individual timer
+    now = datetime.now(timezone.utc)
+    if user.id == combat.user_a_id:
+        combat.user_a_ready = 1
+        if not combat.user_a_started_at:
+            combat.user_a_started_at = now
+            combat.user_a_expires_at = now + timedelta(seconds=TIME_LIMIT_SECONDS)
+    elif user.id == combat.user_b_id:
+        combat.user_b_ready = 1
+        if not combat.user_b_started_at:
+            combat.user_b_started_at = now
+            combat.user_b_expires_at = now + timedelta(seconds=TIME_LIMIT_SECONDS)
+    
+    # If both are ready, change state to RUNNING
+    if combat.user_a_ready and combat.user_b_ready:
         combat.state = CombatState.RUNNING
-        combat.started_at = datetime.utcnow()
-        combat.expires_at = datetime.utcnow() + timedelta(seconds=TIME_LIMIT_SECONDS)
+        combat.started_at = combat.user_a_started_at or now  # Use first user's start time
+        # Keep general expires_at for backward compatibility (use later of the two individual timers)
+        combat.expires_at = max(
+            combat.user_a_expires_at if combat.user_a_expires_at else now,
+            combat.user_b_expires_at if combat.user_b_expires_at else now
+        )
     
     db.commit()
     
@@ -1033,7 +1062,7 @@ def get_my_api_key(
         raise HTTPException(status_code=404, detail="API keys not available")
     
     # Check if expired
-    if datetime.utcnow() > temp_keys.expires_at:
+    if datetime.now(timezone.utc) > temp_keys.expires_at:
         db.delete(temp_keys)
         db.commit()
         raise HTTPException(status_code=410, detail="API keys expired")
@@ -1105,7 +1134,7 @@ def agent_submit_answer(
             raise HTTPException(status_code=403, detail="Not authorized")
         
         # Check individual timer for User A
-        if combat.user_a_expires_at and datetime.utcnow() > combat.user_a_expires_at:
+        if combat.user_a_expires_at and datetime.now(timezone.utc) > combat.user_a_expires_at:
             raise HTTPException(status_code=400, detail="Combat time limit expired")
         
         existing = db.query(Submission).filter(
@@ -1137,7 +1166,7 @@ def agent_submit_answer(
         # Mark combat as OPEN - waiting for opponent
         combat.state = CombatState.OPEN
         # Set expiration to 24 hours for finding opponent
-        combat.expires_at = datetime.utcnow() + timedelta(hours=24)
+        combat.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
         
         db.commit()
         return AgentSubmitResponse(ok=True, status="submitted_waiting_for_opponent")
@@ -1146,16 +1175,15 @@ def agent_submit_answer(
     if combat.state != CombatState.RUNNING:
         raise HTTPException(status_code=400, detail="Combat is not running")
     
-    # Check time limit - use individual timer for online combats
-    now = datetime.utcnow()
-    if combat.is_open:
-        # Check individual timer based on user
-        if user.id == combat.user_a_id and combat.user_a_expires_at and now > combat.user_a_expires_at:
-            raise HTTPException(status_code=400, detail="Combat time limit expired")
-        elif user.id == combat.user_b_id and combat.user_b_expires_at and now > combat.user_b_expires_at:
-            raise HTTPException(status_code=400, detail="Combat time limit expired")
-    elif combat.expires_at and now > combat.expires_at:
-        # Traditional combat - shared timer
+    # Check time limit - use individual timer for all combats
+    now = datetime.now(timezone.utc)
+    # Check individual timer based on user
+    if user.id == combat.user_a_id and combat.user_a_expires_at and now > combat.user_a_expires_at:
+        raise HTTPException(status_code=400, detail="Combat time limit expired")
+    elif user.id == combat.user_b_id and combat.user_b_expires_at and now > combat.user_b_expires_at:
+        raise HTTPException(status_code=400, detail="Combat time limit expired")
+    # Fallback to shared timer if individual timers not set (backward compatibility)
+    elif not combat.user_a_expires_at and not combat.user_b_expires_at and combat.expires_at and now > combat.expires_at:
         raise HTTPException(status_code=400, detail="Combat time limit expired")
     
     existing = db.query(Submission).filter(
@@ -1187,7 +1215,7 @@ def agent_submit_answer(
         
         # Complete the combat immediately
         combat.state = CombatState.COMPLETED
-        combat.completed_at = datetime.utcnow()
+        combat.completed_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(combat)
         determine_winner_and_update_stats(combat, db)
@@ -1197,7 +1225,7 @@ def agent_submit_answer(
     all_submissions = db.query(Submission).filter(Submission.combat_id == combat.id).count()
     if all_submissions + 1 >= 2:
         combat.state = CombatState.COMPLETED
-        combat.completed_at = datetime.utcnow()
+        combat.completed_at = datetime.now(timezone.utc)
         db.commit()
         # Refresh combat to get latest state
         db.refresh(combat)
@@ -2112,18 +2140,12 @@ def health_check():
     """Health check endpoint"""
     return HealthResponse(
         status="healthy",
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )
 
 # ============================================================================
 # BACKGROUND TASK: Check for expired combats
 # ============================================================================
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup"""
-    from database import init_database
-    init_database()
 
 if __name__ == "__main__":
     import uvicorn
