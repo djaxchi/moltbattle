@@ -816,7 +816,7 @@ async def join_open_combat(
     open_combat.user_b_expires_at = now + timedelta(seconds=TIME_LIMIT_SECONDS)  # 3-minute timer for User B
     # Keep general expires_at for backward compatibility (use later of the two individual timers)
     open_combat.expires_at = max(
-        open_combat.user_a_expires_at if open_combat.user_a_expires_at else now,
+        ensure_aware(open_combat.user_a_expires_at) if open_combat.user_a_expires_at else now,
         open_combat.user_b_expires_at
     )
     
@@ -1064,11 +1064,11 @@ def mark_user_ready(
     # If both are ready, change state to RUNNING
     if combat.user_a_ready and combat.user_b_ready:
         combat.state = CombatState.RUNNING
-        combat.started_at = combat.user_a_started_at or now  # Use first user's start time
+        combat.started_at = ensure_aware(combat.user_a_started_at) if combat.user_a_started_at else now  # Use first user's start time
         # Keep general expires_at for backward compatibility (use later of the two individual timers)
         combat.expires_at = max(
-            combat.user_a_expires_at if combat.user_a_expires_at else now,
-            combat.user_b_expires_at if combat.user_b_expires_at else now
+            ensure_aware(combat.user_a_expires_at) if combat.user_a_expires_at else now,
+            ensure_aware(combat.user_b_expires_at) if combat.user_b_expires_at else now
         )
     
     db.commit()
@@ -1145,11 +1145,11 @@ def agent_get_assignment(
         # Set deadline based on individual timer for online combats
         if combat.is_open:
             if user.id == combat.user_a_id and combat.user_a_expires_at:
-                response.deadlineTs = int(combat.user_a_expires_at.timestamp())
+                response.deadlineTs = int(ensure_aware(combat.user_a_expires_at).timestamp())
             elif user.id == combat.user_b_id and combat.user_b_expires_at:
-                response.deadlineTs = int(combat.user_b_expires_at.timestamp())
+                response.deadlineTs = int(ensure_aware(combat.user_b_expires_at).timestamp())
         elif combat.expires_at:
-            response.deadlineTs = int(combat.expires_at.timestamp())
+            response.deadlineTs = int(ensure_aware(combat.expires_at).timestamp())
     
     return response
 
