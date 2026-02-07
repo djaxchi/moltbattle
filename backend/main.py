@@ -39,15 +39,44 @@ async def lifespan(app: FastAPI):
     from database import init_database, DATABASE_URL
     import os
     
+    # Log the database path for debugging deployments
+    print(f"📦 DATABASE_URL = {DATABASE_URL}")
+    
     db_exists = False
     if "sqlite" in DATABASE_URL:
         db_path = DATABASE_URL.replace("sqlite:///", "")
+        db_dir = os.path.dirname(db_path)
+        
+        print(f"📂 Database file path: {db_path}")
+        print(f"📂 Database directory: {db_dir}")
+        
+        # Ensure the data directory exists (important for volume mounts)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+        
+        # Warn if database is NOT on the persistent volume
+        if not db_path.startswith("/app/data/"):
+            print(f"⚠️  WARNING: Database path '{db_path}' is NOT under /app/data/!")
+            print(f"⚠️  Data will be LOST on redeployment. Set DATABASE_URL=sqlite:////app/data/combat.db")
+        
         db_exists = os.path.exists(db_path)
+        print(f"📂 Database file exists: {db_exists}")
+        
+        # List files in /app/data/ if directory exists
+        data_dir = "/app/data"
+        if os.path.exists(data_dir):
+            print(f"📂 Files in {data_dir}: {os.listdir(data_dir)}")
+        else:
+            print(f"📂 {data_dir} directory does NOT exist")
     
     if not db_exists:
         init_database()
     else:
-        print("✅ Database already exists - skipping initialization")
+        # Still ensure schema is up to date (create_all is idempotent)
+        from models import Base
+        from database import engine
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database already exists - schema updated if needed")
     
     yield
     # Shutdown: cleanup if needed

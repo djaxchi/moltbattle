@@ -6,7 +6,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Default to /app/data/ which is the Railway volume mount path
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////app/data/combat.db")
+
+# Safety: ensure SQLite databases use the persistent volume directory
+if DATABASE_URL.startswith("sqlite:///") and "/app/data/" not in DATABASE_URL:
+    import sys
+    print(f"⚠️  WARNING: DATABASE_URL={DATABASE_URL} is NOT using /app/data/ volume!", file=sys.stderr)
+    print(f"⚠️  This will cause data loss on redeployment!", file=sys.stderr)
 
 engine = create_engine(
     DATABASE_URL,
