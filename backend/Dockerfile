@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create data directory
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chmod 777 /app/data
 
 # Run migrations and seed on startup
 CMD python init_db.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
