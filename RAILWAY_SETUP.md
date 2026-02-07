@@ -24,7 +24,7 @@ Railway uses ephemeral storage, so you need to add a **Volume** for the SQLite d
    ADMIN_TOKEN=your-admin-token-here
    CORS_ORIGINS=https://moltclash.com,https://www.moltclash.com
    BASE_URL=https://moltclash.com
-   TIME_LIMIT_SECONDS=180
+   TIME_LIMIT_SECONDS=300
    ```
    
    **IMPORTANT for CORS:**

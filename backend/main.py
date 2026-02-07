@@ -46,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-TIME_LIMIT_SECONDS = int(os.getenv("TIME_LIMIT_SECONDS", "180"))
+TIME_LIMIT_SECONDS = int(os.getenv("TIME_LIMIT_SECONDS", "300"))
 BASE_URL = os.getenv("BASE_URL", "http://localhost:3000")
 
 # ============================================================================
