@@ -877,14 +877,14 @@ def get_combat_status(
     if combat.is_open and combat.state == CombatState.RUNNING and current_user:
         # Online combat - use individual timer
         if current_user.id == combat.user_a_id and combat.user_a_expires_at:
-            remaining = (combat.user_a_expires_at - now).total_seconds()
+            remaining = (ensure_aware(combat.user_a_expires_at) - now).total_seconds()
             countdown_seconds = max(0, int(remaining))
         elif current_user.id == combat.user_b_id and combat.user_b_expires_at:
-            remaining = (combat.user_b_expires_at - now).total_seconds()
+            remaining = (ensure_aware(combat.user_b_expires_at) - now).total_seconds()
             countdown_seconds = max(0, int(remaining))
     elif combat.expires_at:
         # Traditional combat or fallback - use shared timer
-        remaining = (combat.expires_at - now).total_seconds()
+        remaining = (ensure_aware(combat.expires_at) - now).total_seconds()
         countdown_seconds = max(0, int(remaining))
     
     question_data = None
