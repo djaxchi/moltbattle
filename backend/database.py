@@ -25,9 +25,28 @@ def get_db():
         db.close()
 
 def init_database():
-    """Initialize the database - create all tables"""
+    """Initialize the database - create all tables if they don't exist"""
+    import os
+    
+    # Check if database file exists (for SQLite)
+    db_exists = False
+    if "sqlite" in DATABASE_URL:
+        db_path = DATABASE_URL.replace("sqlite:///", "")
+        db_exists = os.path.exists(db_path)
+    
     Base.metadata.create_all(bind=engine)
-    print("Database initialized successfully!")
+    
+    if db_exists:
+        print("✅ Database already exists - schema updated if needed")
+    else:
+        print("✅ Database initialized successfully!")
+        # Only seed questions on first initialization
+        try:
+            from seed_questions import seed_questions
+            seed_questions()
+            print("✅ Questions seeded successfully!")
+        except Exception as e:
+            print(f"⚠️  Question seeding skipped: {e}")
 
 if __name__ == "__main__":
     init_database()
