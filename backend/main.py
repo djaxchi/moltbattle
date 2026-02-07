@@ -32,6 +32,16 @@ from middleware import verify_admin_token, get_current_user_from_token, get_curr
 from rate_limiter import login_rate_limiter, register_rate_limiter, token_generation_rate_limiter
 from hf_datasets import question_service, verify_answer
 
+# Helper function to ensure datetime is timezone-aware (SQLite returns naive datetimes)
+def ensure_aware(dt: Optional[datetime]) -> Optional[datetime]:
+    """Convert naive datetime to UTC-aware datetime. Returns None if dt is None."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Assume naive datetimes from DB are UTC
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown"""
@@ -838,8 +848,8 @@ def get_combat_status(
     now = datetime.now(timezone.utc)
     if combat.is_open and combat.state == CombatState.RUNNING:
         # Check individual timers for online combats
-        user_a_expired = combat.user_a_expires_at and now > combat.user_a_expires_at
-        user_b_expired = combat.user_b_expires_at and now > combat.user_b_expires_at
+        user_a_expired = combat.user_a_expires_at and now > ensure_aware(combat.user_a_expires_at)
+        user_b_expired = combat.user_b_expires_at and now > ensure_aware(combat.user_b_expires_at)
         
         # If both users have expired timers, mark combat as expired
         if user_a_expired and (not combat.user_b_id or user_b_expired):
@@ -848,7 +858,7 @@ def get_combat_status(
             db.commit()
             db.refresh(combat)
             determine_winner_and_update_stats(combat, db)
-    elif combat.expires_at and now > combat.expires_at:
+    elif combat.expires_at and now > ensure_aware(combat.expires_at):
         # Traditional combat or OPEN state expiration
         if combat.state == CombatState.RUNNING:
             combat.state = CombatState.EXPIRED
@@ -1091,7 +1101,7 @@ def get_my_api_key(
         raise HTTPException(status_code=404, detail="API keys not available")
     
     # Check if expired
-    if datetime.now(timezone.utc) > temp_keys.expires_at:
+    if datetime.now(timezone.utc) > ensure_aware(temp_keys.expires_at):
         db.delete(temp_keys)
         db.commit()
         raise HTTPException(status_code=410, detail="API keys expired")
@@ -1163,7 +1173,7 @@ def agent_submit_answer(
             raise HTTPException(status_code=403, detail="Not authorized")
         
         # Check individual timer for User A
-        if combat.user_a_expires_at and datetime.now(timezone.utc) > combat.user_a_expires_at:
+        if combat.user_a_expires_at and datetime.now(timezone.utc) > ensure_aware(combat.user_a_expires_at):
             raise HTTPException(status_code=400, detail="Combat time limit expired")
         
         existing = db.query(Submission).filter(
@@ -1207,12 +1217,12 @@ def agent_submit_answer(
     # Check time limit - use individual timer for all combats
     now = datetime.now(timezone.utc)
     # Check individual timer based on user
-    if user.id == combat.user_a_id and combat.user_a_expires_at and now > combat.user_a_expires_at:
+    if user.id == combat.user_a_id and combat.user_a_expires_at and now > ensure_aware(combat.user_a_expires_at):
         raise HTTPException(status_code=400, detail="Combat time limit expired")
-    elif user.id == combat.user_b_id and combat.user_b_expires_at and now > combat.user_b_expires_at:
+    elif user.id == combat.user_b_id and combat.user_b_expires_at and now > ensure_aware(combat.user_b_expires_at):
         raise HTTPException(status_code=400, detail="Combat time limit expired")
     # Fallback to shared timer if individual timers not set (backward compatibility)
-    elif not combat.user_a_expires_at and not combat.user_b_expires_at and combat.expires_at and now > combat.expires_at:
+    elif not combat.user_a_expires_at and not combat.user_b_expires_at and combat.expires_at and now > ensure_aware(combat.expires_at):
         raise HTTPException(status_code=400, detail="Combat time limit expired")
     
     existing = db.query(Submission).filter(
