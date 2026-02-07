@@ -24,9 +24,8 @@ build/
 .env
 .env.local
 .env.production
-.firebase-service-account.json
-firebase-service-account.json
 client/
+frontend-design/
 
 # Database
 *.db
@@ -49,6 +48,5 @@ Thumbs.db
 # Logs
 *.log
 logs/
-backend/firebase-service-account.json
 backend/seed_questions.py
 seed_questions.py

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getCombatStatus, getCombatResult } from '../api'
-import { Gamepad2, Clock, Target, BarChart3, CheckCircle, XCircle, Trophy, Handshake, Home, Zap, AlertTriangle } from 'lucide-react'
+import { getCombatStatus, getCombatResult, getMyApiKey } from '../api'
+import { Gamepad2, Clock, Target, BarChart3, CheckCircle, XCircle, Trophy, Handshake, Home, Zap, AlertTriangle, Key, Copy, Loader } from 'lucide-react'
 
 function Dashboard() {
   const { code } = useParams()
@@ -11,6 +11,8 @@ function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [redirecting, setRedirecting] = useState(false)
+  const [myKey, setMyKey] = useState(null)
+  const [keyCopied, setKeyCopied] = useState(false)
 
   const fetchStatus = async () => {
     try {
@@ -42,9 +44,26 @@ function Dashboard() {
 
   useEffect(() => {
     fetchStatus()
+    fetchMyKey()
     const interval = setInterval(fetchStatus, 2000)
     return () => clearInterval(interval)
   }, [code])
+
+  const fetchMyKey = async () => {
+    try {
+      const data = await getMyApiKey(code)
+      setMyKey(data.key)
+    } catch (err) {
+      // Key might not be available yet or already retrieved
+      console.log('Could not fetch API key:', err.response?.status)
+    }
+  }
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    setKeyCopied(true)
+    setTimeout(() => setKeyCopied(false), 2000)
+  }
 
   if (loading) {
     return <div className="container"><div className="loading">Loading dashboard</div></div>
@@ -84,6 +103,51 @@ function Dashboard() {
             <span className="info-value">{combat.userBUsername}</span>
           </div>
         </div>
+
+        {/* API Key Display */}
+        {myKey && combat.state === 'RUNNING' && (
+          <div className="dashboard-section">
+            <div style={{
+              background: 'rgba(0, 170, 255, 0.1)',
+              border: '1px solid rgba(0, 170, 255, 0.3)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '1rem',
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.75rem',
+                color: 'var(--color-accent)',
+                fontSize: '0.9rem',
+                fontWeight: '500'
+              }}>
+                <Key size={16} />
+                Your API Key
+              </div>
+              <div style={{
+                background: 'rgba(0, 0, 0, 0.3)',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                fontFamily: 'monospace',
+                fontSize: '0.85rem',
+                wordBreak: 'break-all',
+                marginBottom: '0.75rem',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                {myKey}
+              </div>
+              <button 
+                className="btn btn-secondary btn-sm"
+                onClick={() => copyToClipboard(myKey)}
+                style={{ width: '100%' }}
+              >
+                {keyCopied ? <CheckCircle size={16} /> : <Copy size={16} />}
+                {keyCopied ? 'Copied!' : 'Copy API Key'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Timer */}
         {combat.countdownSeconds !== null && combat.state === 'RUNNING' && (
@@ -136,6 +200,27 @@ function Dashboard() {
           </div>
         )}
 
+        {/* OPEN State - Waiting for opponent */}
+        {combat.state === 'OPEN' && (
+          <div className="dashboard-section">
+            <div className="action-notice" style={{ 
+              background: 'rgba(0, 170, 255, 0.1)', 
+              border: '1px solid rgba(0, 170, 255, 0.3)',
+              marginBottom: '1rem' 
+            }}>
+              <Loader size={18} className="spin" />
+              <div>
+                <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                  Waiting for opponent...
+                </div>
+                <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                  Your answer has been submitted! Another player will join soon to complete this combat.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Running State Notice with API Docs */}
         {combat.state === 'RUNNING' && (
           <div className="dashboard-section">
@@ -165,17 +250,19 @@ function Dashboard() {
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ marginBottom: '0.5rem' }}>
                     <strong style={{ color: '#22c55e' }}>GET</strong>{' '}
-                    <code style={{ color: '#a5b4fc' }}>/agent/me</code>
-                    <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>→ Get question prompt & choices</span>
+                    <code style={{ color: '#a5b4fc' }}>https://api.moltclash.com/agent/me</code>
+                    <div style={{ color: '#9ca3af', marginLeft: '2rem', fontSize: '0.8rem' }}>→ Get question prompt & choices</div>
                   </div>
                   <div style={{ marginBottom: '0.5rem' }}>
                     <strong style={{ color: '#f59e0b' }}>POST</strong>{' '}
-                    <code style={{ color: '#a5b4fc' }}>/agent/submit</code>
-                    <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>→ Submit answer</span>
+                    <code style={{ color: '#a5b4fc' }}>https://api.moltclash.com/agent/submit</code>
+                    <div style={{ color: '#9ca3af', marginLeft: '2rem', fontSize: '0.8rem' }}>→ Submit your answer</div>
                   </div>
-                  <div>
-                    <strong style={{ color: '#3b82f6' }}>Header</strong>{' '}
-                    <code style={{ color: '#fbbf24' }}>Authorization: Bearer {'<key>'}</code>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <strong style={{ color: '#3b82f6' }}>Header:</strong>{' '}
+                    <code style={{ color: '#fbbf24', wordBreak: 'break-all', display: 'block', marginTop: '0.25rem' }}>
+                      Authorization: Bearer {myKey || 'YOUR_API_KEY'}
+                    </code>
                   </div>
                 </div>
                 
@@ -200,29 +287,36 @@ function Dashboard() {
                   fontSize: '0.7rem',
                   lineHeight: '1.4',
                   color: '#e5e7eb'
-                }}>{`# Quick Python example with local model
+                }}>{`# Python example with local model
 import requests
 import ollama  # or transformers, llama-cpp-python
 
-API_BASE = "https://api.moltclash.com"  # or http://localhost:8000 for local dev
+API_BASE = "https://api.moltclash.com"
+API_KEY = "${myKey || 'YOUR_API_KEY'}"
 
+# Get the question
 resp = requests.get(
     f"{API_BASE}/agent/me",
-    headers={"Authorization": "Bearer <YOUR_KEY>"}
+    headers={"Authorization": f"Bearer {API_KEY}"}
 )
 question = resp.json()["prompt"]
+choices = resp.json().get("choices", [])
 
 # Use your local model (Ollama example)
 response = ollama.chat(
-    model="llama2",  # your local model
-    messages=[{"role": "user", "content": question}]
+    model="llama2",  # or llama3, mistral, etc.
+    messages=[{
+        "role": "user",
+        "content": f"{question}\\nChoices: {choices}"
+    }]
 )
 answer = response["message"]["content"].strip()
 
+# Submit your answer
 requests.post(
     f"{API_BASE}/agent/submit",
-    headers={"Authorization": "Bearer <YOUR_KEY>"},
-    json={"answer": answer}  # A/B/C/D or TRUE/FALSE/UNKNOWN
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    json={"answer": answer}
 )`}</pre>
               </div>
             </details>

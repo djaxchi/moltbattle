@@ -61,15 +61,6 @@ if [ ! -f "$APP_DIR/.env.production" ]; then
     echo ""
 fi
 
-if [ ! -f "$APP_DIR/firebase-service-account.json" ]; then
-    echo "⚠️  firebase-service-account.json not found!"
-    echo "   Please upload your Firebase service account key."
-    echo ""
-    echo "   From your local machine:"
-    echo "   scp firebase-service-account.json root@YOUR_VPS_IP:$APP_DIR/"
-    echo ""
-fi
-
 # Create certbot directories
 mkdir -p $APP_DIR/certbot/conf $APP_DIR/certbot/www
 
@@ -77,7 +68,7 @@ echo ""
 echo "✅ VPS Setup Complete!"
 echo ""
 echo "📋 Next Steps:"
-echo "1. Upload .env.production and firebase-service-account.json if not done"
+echo "1. Upload .env.production if not done"
 echo "2. Configure DNS to point $DOMAIN to this server"
 echo "3. Run: cd $APP_DIR && ./init-letsencrypt.sh"
 echo "4. Run: ./deploy.sh"

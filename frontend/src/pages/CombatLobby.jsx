@@ -33,8 +33,8 @@ function CombatLobby() {
         }
       }
       
-      // Redirect to dashboard once combat is running
-      if (data.state === 'RUNNING' || data.state === 'COMPLETED' || data.state === 'EXPIRED') {
+      // Redirect to dashboard once combat is running or completed
+      if (data.state === 'RUNNING' || data.state === 'COMPLETED' || data.state === 'EXPIRED' || data.state === 'OPEN') {
         navigate(`/dashboard/${code}`)
       }
     } catch (err) {

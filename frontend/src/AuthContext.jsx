@@ -1,107 +1,79 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  GoogleAuthProvider,
-  signInWithPopup
-} from 'firebase/auth';
-import { auth } from './firebase';
-import { getCurrentUser } from './api';
+import { getCurrentUser, loginUser, registerUserWithPassword } from './api';
 
 const AuthContext = createContext(null);
 
+const TOKEN_KEY = 'molt_auth_token';
+
 export function AuthProvider({ children }) {
-  const [firebaseUser, setFirebaseUser] = useState(null);
-  const [user, setUser] = useState(null); // Our backend user
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [needsUsername, setNeedsUsername] = useState(false);
   const [redirectUrl, setRedirectUrl] = useState(null);
 
+  // Check for existing token and load user on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setFirebaseUser(firebaseUser);
-      
-      if (firebaseUser) {
-        // Try to get user from our backend
-        try {
-          const backendUser = await getCurrentUser();
-          setUser(backendUser);
-          setNeedsUsername(false);
-        } catch (error) {
-          // 404 means user doesn't exist in our DB yet - needs username
-          if (error.response?.status === 404) {
-            setNeedsUsername(true);
-            setUser(null);
-          } else {
-            console.error('Error fetching user:', error);
-            setUser(null);
-          }
-        }
-      } else {
-        setUser(null);
-        setNeedsUsername(false);
-      }
-      
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      loadUser();
+    } else {
       setLoading(false);
-    });
-
-    return () => unsubscribe();
+    }
   }, []);
 
-  const signUp = async (email, password) => {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    return result.user;
+  const loadUser = async () => {
+    try {
+      const userData = await getCurrentUser();
+      setUser(userData);
+    } catch (error) {
+      // Token invalid or expired, clear it
+      localStorage.removeItem(TOKEN_KEY);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const signIn = async (email, password) => {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return result.user;
+  const signUp = async (username, password, email = null, techDescription = null) => {
+    const response = await registerUserWithPassword(username, password, email, techDescription);
+    localStorage.setItem(TOKEN_KEY, response.token);
+    setUser(response.user);
+    return response;
   };
 
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return result.user;
+  const signIn = async (username, password) => {
+    const response = await loginUser(username, password);
+    localStorage.setItem(TOKEN_KEY, response.token);
+    setUser(response.user);
+    return response;
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    localStorage.removeItem(TOKEN_KEY);
     setUser(null);
   };
 
   const refreshUser = async () => {
-    if (firebaseUser) {
-      try {
-        const backendUser = await getCurrentUser();
-        setUser(backendUser);
-      } catch (error) {
-        console.error('Error refreshing user:', error);
-      }
+    try {
+      const userData = await getCurrentUser();
+      setUser(userData);
+    } catch (error) {
+      console.error('Error refreshing user:', error);
     }
   };
 
-  const getIdToken = async () => {
-    if (firebaseUser) {
-      return await firebaseUser.getIdToken();
-    }
-    return null;
+  const getToken = () => {
+    return localStorage.getItem(TOKEN_KEY);
   };
 
   const value = {
-    firebaseUser,
     user,
     loading,
     signUp,
     signIn,
-    signInWithGoogle,
     signOut,
     refreshUser,
-    getIdToken,
+    getToken,
     isAuthenticated: !!user,
-    needsUsername,
-    setNeedsUsername,
     redirectUrl,
     setRedirectUrl,
   };

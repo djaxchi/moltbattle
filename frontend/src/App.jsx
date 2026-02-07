@@ -4,12 +4,15 @@ import Landing from './pages/Landing'
 import CombatLobby from './pages/CombatLobby'
 import AcceptInvite from './pages/AcceptInvite'
 import Dashboard from './pages/Dashboard'
-import { Auth, RegisterHandle } from './pages/Auth'
-import { Zap, LogOut } from 'lucide-react'
+import ApiDocs from './pages/ApiDocs'
+import MCPDocs from './pages/MCPDocs'
+import { Auth } from './pages/Auth'
+import { LogOut, BookOpen, Cpu } from 'lucide-react'
+import logo from '../images/icon.png'
 
 // Protected route wrapper - redirects to auth if not logged in
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading, needsUsername, firebaseUser, setRedirectUrl } = useAuth()
+  const { isAuthenticated, loading, setRedirectUrl } = useAuth()
   const location = useLocation()
   
   if (loading) {
@@ -20,16 +23,10 @@ function ProtectedRoute({ children }) {
     )
   }
   
-  if (!firebaseUser) {
+  if (!isAuthenticated) {
     // Save the current URL to redirect back after auth
     setRedirectUrl(location.pathname)
     return <Navigate to="/auth" replace />
-  }
-  
-  if (needsUsername) {
-    // Save the current URL to redirect back after registration
-    setRedirectUrl(location.pathname)
-    return <Navigate to="/register" replace />
   }
   
   return children
@@ -37,7 +34,7 @@ function ProtectedRoute({ children }) {
 
 // Auth route wrapper (redirect to home if already authenticated)
 function AuthRoute({ children }) {
-  const { isAuthenticated, loading, needsUsername, firebaseUser } = useAuth()
+  const { isAuthenticated, loading } = useAuth()
   
   if (loading) {
     return (
@@ -45,10 +42,6 @@ function AuthRoute({ children }) {
         <div className="loading">Loading...</div>
       </div>
     )
-  }
-  
-  if (firebaseUser && needsUsername) {
-    return <Navigate to="/register" replace />
   }
   
   if (isAuthenticated) {
@@ -59,36 +52,37 @@ function AuthRoute({ children }) {
 }
 
 function App() {
-  const { user, signOut, isAuthenticated, firebaseUser } = useAuth()
+  const { user, signOut, isAuthenticated } = useAuth()
 
   return (
     <div>
       {/* Navigation bar */}
       <nav className="navbar">
         <a href="/" className="navbar-brand">
-          <Zap size={24} fill="#ef4444" />
+          <img src={logo} alt="MoltClash" style={{ height: '28px', width: 'auto', filter: 'drop-shadow(0 0 8px #ff0055)' }} />
           MoltClash
         </a>
         
-        {firebaseUser ? (
+        <a href="/docs" className="btn btn-sm btn-secondary" style={{ marginLeft: 'auto', marginRight: '0.5rem' }}>
+          <BookOpen size={16} />
+          API Docs
+        </a>
+        
+        <a href="/mcp-docs" className="btn btn-sm btn-secondary" style={{ marginRight: '1rem' }}>
+          <Cpu size={16} />
+          MCP Guide
+        </a>
+        
+        {isAuthenticated ? (
           <div className="navbar-actions">
-            {isAuthenticated ? (
-              <div className="navbar-user">
-                <div>
-                  <div className="font-bold">{user?.username}</div>
-                  <div className="text-xs text-muted">
-                    {user?.rank} • {user?.wins}W / {user?.losses}L
-                  </div>
+            <div className="navbar-user">
+              <div>
+                <div className="font-bold">{user?.username}</div>
+                <div className="text-xs text-muted">
+                  {user?.rank} • {user?.wins}W / {user?.losses}L
                 </div>
               </div>
-            ) : (
-              <div className="navbar-user">
-                <div>
-                  <div className="font-bold">{firebaseUser.email}</div>
-                  <div className="text-xs text-muted">Setting up profile...</div>
-                </div>
-              </div>
-            )}
+            </div>
             <button onClick={signOut} className="btn btn-secondary btn-sm">
               <LogOut size={16} />
               Sign Out
@@ -104,6 +98,8 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Landing />} />
+        <Route path="/docs" element={<ApiDocs />} />
+        <Route path="/mcp-docs" element={<MCPDocs />} />
         <Route path="/dashboard/:code" element={<Dashboard />} />
         
         {/* Auth routes */}
@@ -112,7 +108,6 @@ function App() {
             <Auth />
           </AuthRoute>
         } />
-        <Route path="/register" element={<RegisterHandle />} />
 
         {/* Protected routes - require auth to create/join combats */}
         <Route path="/lobby/:code" element={

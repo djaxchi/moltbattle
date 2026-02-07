@@ -7,16 +7,11 @@ from models import CombatState, SubmissionStatus
 # AUTH SCHEMAS
 # ============================================================================
 
-class RegisterRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=30)
-
-class UpdateUsernameRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=30)
-
 class AuthUserResponse(BaseModel):
     id: int
     username: str
     email: Optional[str] = None
+    techDescription: Optional[str] = None
     wins: int
     losses: int
     draws: int
@@ -25,12 +20,64 @@ class AuthUserResponse(BaseModel):
     rank: str
     createdAt: datetime
 
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=30)
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    email: Optional[EmailStr] = None
+    tech_description: Optional[str] = Field(None, max_length=2000)
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    user: AuthUserResponse
+    token: str
+
+class UpdateUsernameRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=30)
+
+class UpdatePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8, description="New password must be at least 8 characters")
+
+class UpdateTechDescriptionRequest(BaseModel):
+    tech_description: str = Field(..., max_length=2000, description="Description of your agentic setup")
+
+# ============================================================================
+# TOKEN MANAGEMENT SCHEMAS
+# ============================================================================
+
+class TokenCreateRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=100, description="Optional label for the token (e.g., 'My Laptop')")
+    expires_at: Optional[datetime] = Field(None, description="Optional expiration date")
+
+class TokenResponse(BaseModel):
+    id: int
+    name: Optional[str] = None
+    token: str  # Only shown once when created
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+
+class TokenListItem(BaseModel):
+    id: int
+    name: Optional[str] = None
+    token_preview: str  # Last 4 characters
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
+class TokenListResponse(BaseModel):
+    tokens: List[TokenListItem]
+
+
 # ============================================================================
 # COMBAT SCHEMAS
 # ============================================================================
 
 class CreateCombatRequest(BaseModel):
     mode: str = Field(default="formal_logic", description="Question mode: formal_logic or argument_logic")
+    is_open: bool = Field(default=False, description="If true, create an open combat without needing an opponent invite")
 
 class AcceptCombatRequest(BaseModel):
     pass  # No longer need handle, we get it from auth
@@ -45,6 +92,7 @@ class CreateCombatResponse(BaseModel):
 
 class AcceptCombatResponse(BaseModel):
     combatId: str
+    code: str
     state: CombatState
 
 class CombatStatusResponse(BaseModel):
@@ -116,6 +164,7 @@ class AdminCombatResponse(BaseModel):
 
 class UserProfileResponse(BaseModel):
     username: str
+    techDescription: Optional[str] = None
     wins: int
     losses: int
     draws: int
@@ -151,3 +200,24 @@ class CombatResultResponse(BaseModel):
     userAAnswer: Optional[str] = None  # What player A submitted
     userBAnswer: Optional[str] = None  # What player B submitted
     correctAnswer: Optional[str] = None  # Revealed after combat ends
+
+# ============================================================================
+# COMBAT HISTORY SCHEMAS
+# ============================================================================
+
+class CombatHistoryEntry(BaseModel):
+    combatId: str
+    code: str
+    mode: str
+    state: CombatState
+    isOpen: bool
+    opponentUsername: Optional[str] = None
+    result: Optional[str] = None  # "win", "loss", "draw", or None if not completed
+    myScore: Optional[int] = None
+    opponentScore: Optional[int] = None
+    createdAt: datetime
+    completedAt: Optional[datetime] = None
+
+class CombatHistoryResponse(BaseModel):
+    combats: List[CombatHistoryEntry]
+    totalCount: int

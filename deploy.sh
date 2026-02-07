@@ -15,12 +15,6 @@ if [ ! -f ".env.production" ]; then
     exit 1
 fi
 
-if [ ! -f "firebase-service-account.json" ]; then
-    echo "❌ Error: firebase-service-account.json not found!"
-    echo "   Download your Firebase service account key and place it in the root directory."
-    exit 1
-fi
-
 # Load production environment
 export $(grep -v '^#' .env.production | xargs)
 

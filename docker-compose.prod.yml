@@ -20,10 +20,8 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - BASE_URL=${FRONTEND_URL:-https://moltclash.com}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://moltclash.com,https://www.moltclash.com}
-      - FIREBASE_SERVICE_ACCOUNT_PATH=/app/firebase-service-account.json
     volumes:
       - backend-data:/app/data
-      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

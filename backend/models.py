@@ -11,6 +11,7 @@ class CombatState(str, enum.Enum):
     ACCEPTED = "ACCEPTED"
     KEYS_ISSUED = "KEYS_ISSUED"  # Keys issued, waiting for both to be ready
     RUNNING = "RUNNING"
+    OPEN = "OPEN"  # User A finished, waiting for opponent to complete
     COMPLETED = "COMPLETED"
     EXPIRED = "EXPIRED"
 
@@ -23,9 +24,11 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    firebase_uid = Column(String, unique=True, index=True, nullable=True)  # Firebase user ID
-    email = Column(String, unique=True, index=True, nullable=True)  # User email from Firebase
+    firebase_uid = Column(String, unique=True, index=True, nullable=True)  # Deprecated - kept for migration
+    email = Column(String, unique=True, index=True, nullable=True)
     username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=True)  # Bcrypt hash
+    tech_description = Column(Text, nullable=True)  # Description of agentic setup
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Scoring fields
@@ -37,6 +40,7 @@ class User(Base):
     combats_as_a = relationship("Combat", foreign_keys="Combat.user_a_id", back_populates="user_a")
     combats_as_b = relationship("Combat", foreign_keys="Combat.user_b_id", back_populates="user_b")
     api_keys = relationship("ApiKey", back_populates="user")
+    user_api_tokens = relationship("UserApiToken", back_populates="user")
     submissions = relationship("Submission", back_populates="user")
     
     @property
@@ -77,9 +81,20 @@ class Combat(Base):
     expires_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     
+    # Individual timers for async online combat
+    user_a_started_at = Column(DateTime, nullable=True)
+    user_a_expires_at = Column(DateTime, nullable=True)
+    user_b_started_at = Column(DateTime, nullable=True)
+    user_b_expires_at = Column(DateTime, nullable=True)
+    
     # Ready flags - both must be True before timer starts
     user_a_ready = Column(Integer, default=0, nullable=False)  # 1 if ready, 0 otherwise
     user_b_ready = Column(Integer, default=0, nullable=False)  # 1 if ready, 0 otherwise
+    
+    # Open combat fields - for async matchmaking
+    is_open = Column(Integer, default=0, nullable=False)  # 1 if open combat, 0 if invite-based
+    user_a_score = Column(Integer, nullable=True)  # Score for user A in open combats
+    user_b_score = Column(Integer, nullable=True)  # Score for user B in open combats
     
     user_a = relationship("User", foreign_keys=[user_a_id], back_populates="combats_as_a")
     user_b = relationship("User", foreign_keys=[user_b_id], back_populates="combats_as_b")
@@ -100,6 +115,25 @@ class ApiKey(Base):
     
     combat = relationship("Combat", back_populates="api_keys")
     user = relationship("User", back_populates="api_keys")
+
+
+class UserApiToken(Base):
+    """
+    Persistent API tokens for user authentication.
+    These are long-lived tokens that users can use to authenticate API requests.
+    """
+    __tablename__ = "user_api_tokens"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=True)  # Optional label like "My Laptop" or "Production Agent"
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)  # Optional expiration
+    
+    user = relationship("User", back_populates="user_api_tokens")
 
 class Question(Base):
     __tablename__ = "questions"

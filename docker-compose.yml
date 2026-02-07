@@ -39,5 +39,22 @@ services:
     depends_on:
       - backend
 
+  # Optional: MCP Server for Claude Desktop integration
+  # Uncomment to run MCP server in Docker
+  # mcp:
+  #   build:
+  #     context: ./mcp
+  #   environment:
+  #     - MOLTBATTLE_API_URL=http://backend:8000
+  #     - MCP_SESSION_PATH=/data/mcp_session.json
+  #   volumes:
+  #     - mcp-data:/data
+  #     - ./mcp:/app
+  #   depends_on:
+  #     - backend
+  #   stdin_open: true
+  #   tty: true
+
 volumes:
   backend-data:
+  # mcp-data:
