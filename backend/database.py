@@ -47,13 +47,15 @@ def init_database():
         print("✅ Database already exists - schema updated if needed")
     else:
         print("✅ Database initialized successfully!")
-        # Only seed questions on first initialization
+        # Only seed questions on first initialization (dev mode only)
         try:
             from seed_questions import seed_questions
             seed_questions()
             print("✅ Questions seeded successfully!")
+        except ImportError:
+            print("ℹ️  Question seeding not available (production mode)")
         except Exception as e:
-            print(f"⚠️  Question seeding skipped: {e}")
+            print(f"⚠️  Question seeding failed: {e}")
 
 if __name__ == "__main__":
     init_database()
