@@ -170,4 +170,20 @@ export const getCombatHistory = async () => {
   return response.data;
 };
 
+// ============================================================================
+// TOURNAMENT
+// ============================================================================
+
+export const getTournamentStats = async () => {
+  const response = await api.get('/tournament/stats');
+  return response.data;
+};
+
+export const tournamentSignup = async (email) => {
+  const response = await api.post('/tournament/signup', null, {
+    params: { email }
+  });
+  return response.data;
+};
+
 export default api;

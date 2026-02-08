@@ -201,3 +201,13 @@ class TempApiKey(Base):
     key_b = Column(String, nullable=False)  # Plaintext key for user B
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     expires_at = Column(DateTime, nullable=False)  # Auto-expire after 5 minutes
+
+
+class TournamentSignup(Base):
+    """Store tournament signup information"""
+    __tablename__ = "tournament_signups"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, nullable=True)  # Optional - if logged in
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

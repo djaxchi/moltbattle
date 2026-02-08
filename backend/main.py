@@ -13,7 +13,7 @@ import random
 import json
 
 from database import get_db
-from models import User, Combat, ApiKey, Question, Submission, CombatState, SubmissionStatus, CombatQuestion, TempApiKey, UserApiToken
+from models import User, Combat, ApiKey, Question, Submission, CombatState, SubmissionStatus, CombatQuestion, TempApiKey, UserApiToken, TournamentSignup
 from schemas import (
     CreateCombatRequest, CreateCombatResponse,
     AcceptCombatRequest, AcceptCombatResponse, MatchmakingResponse,
@@ -2358,6 +2358,73 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
             "issues": "Report issues or get help at /api/docs",
             "interactive_docs": "Visit /api/docs"
         }
+    }
+
+# ============================================================================
+# TOURNAMENT SIGNUPS
+# ============================================================================
+
+@app.get("/tournament/stats")
+async def get_tournament_stats(
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get tournament signup statistics"""
+    # Count actual signups
+    actual_count = db.query(TournamentSignup).count()
+    
+    # Add base count of 12 to make it look like we already have signups
+    total_count = actual_count + 12
+    
+    # Check if current user is signed up
+    is_signed_up = False
+    if current_user:
+        signup = db.query(TournamentSignup).filter(
+            (TournamentSignup.email == current_user.email) |
+            (TournamentSignup.username == current_user.username)
+        ).first()
+        is_signed_up = signup is not None
+    
+    return {
+        "count": total_count,
+        "isSignedUp": is_signed_up
+    }
+
+@app.post("/tournament/signup")
+async def tournament_signup(
+    email: str,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
+    """Sign up for the tournament"""
+    # Check if email already signed up
+    existing = db.query(TournamentSignup).filter(TournamentSignup.email == email).first()
+    if existing:
+        return {
+            "success": True,
+            "message": "Already signed up!",
+            "alreadySignedUp": True
+        }
+    
+    # Create signup
+    username = current_user.username if current_user else None
+    signup = TournamentSignup(
+        email=email,
+        username=username
+    )
+    
+    db.add(signup)
+    db.commit()
+    
+    # Get updated count
+    actual_count = db.query(TournamentSignup).count()
+    total_count = actual_count + 12
+    
+    return {
+        "success": True,
+        "message": "Successfully signed up for the tournament!",
+        "count": total_count,
+        "alreadySignedUp": False
     }
 
 # ============================================================================

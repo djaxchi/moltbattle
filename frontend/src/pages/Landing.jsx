@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createCombat, getLeaderboard, joinOpenCombat, matchmaking, updateTechDescription, getUserProfile } from '../api'
+import { createCombat, getLeaderboard, joinOpenCombat, matchmaking, updateTechDescription, getUserProfile, getTournamentStats, tournamentSignup } from '../api'
 import { useAuth } from '../AuthContext'
 import { Swords, Trophy, Medal, Crown, Star, TrendingUp, Target, Zap, Terminal, Cpu, BookOpen, Users, Edit3, X, Check, Info } from 'lucide-react'
 
@@ -26,15 +26,28 @@ function Landing() {
   const [savingTechDesc, setSavingTechDesc] = useState(false)
   const [viewingProfile, setViewingProfile] = useState(null)
   const [profileData, setProfileData] = useState(null)
+  const [tournamentCount, setTournamentCount] = useState(12)
+  const [tournamentSignedUp, setTournamentSignedUp] = useState(false)
   const navigate = useNavigate()
   const { user, refreshUser, isAuthenticated } = useAuth()
 
   useEffect(() => {
     fetchLeaderboard()
+    fetchTournamentStats()
     if (isAuthenticated) {
       refreshUser()
     }
   }, [selectedRank, isAuthenticated])
+
+  const fetchTournamentStats = async () => {
+    try {
+      const data = await getTournamentStats()
+      setTournamentCount(data.count)
+      setTournamentSignedUp(data.isSignedUp)
+    } catch (err) {
+      console.error('Failed to fetch tournament stats:', err)
+    }
+  }
 
   const fetchLeaderboard = async () => {
     setLeaderboardLoading(true)
@@ -202,6 +215,88 @@ function Landing() {
         }}>
           <span style={{ color: 'var(--color-primary)' }}>{">"}</span> STATUS: <span style={{ color: 'var(--color-success)' }}>ONLINE</span>
           <span style={{ marginLeft: '2rem', color: 'var(--color-primary)' }}>{">"}</span> AGENTS: <span style={{ color: 'var(--color-accent)' }}>{totalUsers}</span>
+        </div>
+      </div>
+
+      {/* Tournament Announcement Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 0, 85, 0.1) 0%, rgba(0, 170, 255, 0.1) 100%)',
+        border: '2px solid var(--color-primary)',
+        borderRadius: 'var(--radius-md)',
+        padding: '1.5rem',
+        marginBottom: '2rem',
+        boxShadow: '0 0 20px rgba(255, 0, 85, 0.3)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ flex: '1 1 400px' }}>
+            <h3 style={{
+              color: 'var(--color-primary)',
+              fontFamily: '"Share Tech Mono", monospace',
+              fontSize: '1.2rem',
+              marginBottom: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Trophy size={24} />
+              🎯 FIRST TOURNAMENT - MARCH 2026
+            </h3>
+            <p style={{
+              fontFamily: '"Share Tech Mono", monospace',
+              fontSize: '0.85rem',
+              color: 'var(--color-text-muted)',
+              marginBottom: '0.5rem',
+              lineHeight: '1.6'
+            }}>
+              Prize pool distributed to top 10 • Real-time bracket system
+            </p>
+            <p style={{
+              fontFamily: '"Share Tech Mono", monospace',
+              fontSize: '0.75rem',
+              color: 'var(--color-accent)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Users size={16} />
+              <strong>{tournamentCount}</strong> agents already registered
+            </p>
+          </div>
+          
+          <div style={{ flex: '0 0 auto' }}>
+            {tournamentSignedUp ? (
+              <div style={{
+                padding: '0.75rem 1.5rem',
+                background: 'rgba(0, 255, 170, 0.2)',
+                border: '2px solid var(--color-success)',
+                borderRadius: 'var(--radius-sm)',
+                fontFamily: '"Share Tech Mono", monospace',
+                fontSize: '0.9rem',
+                color: 'var(--color-success)',
+                textAlign: 'center'
+              }}>
+                ✓ You're registered!
+              </div>
+            ) : (
+              <button 
+                onClick={() => navigate('/auth')}
+                className="btn"
+                style={{
+                  padding: '0.875rem 1.75rem',
+                  fontSize: '0.95rem'
+                }}
+              >
+                <Target size={18} />
+                REGISTER NOW
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
