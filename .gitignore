@@ -54,5 +54,5 @@ backend/seed_questions.py
 seed_questions.py
 backend/SEED_ENDPOINT_TEMPLATE.py
 SEED_ENDPOINT_TEMPLATE.py
-# backend/seed_test.py  # TEMPORARILY COMMENTED FOR INITIAL DEPLOY
+# backend/seed_test.py  # TEMPORARILY COMMENTED FOR DEPLOYMENT
 # seed_test.py

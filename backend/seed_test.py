@@ -199,31 +199,29 @@ TECH_STACKS_TROLLY = [
 NO_TECH_STACK = None
 
 def create_realistic_stats():
-    """Generate realistic win/loss stats with varied distribution"""
-    # More varied distribution - not Gaussian
-    # 50% casuals (0-5 games), 25% regulars (6-30 games), 
-    # 15% dedicated (31-100 games), 10% hardcore (100+ games)
+    """Generate realistic win/loss stats with Gaussian distribution centered around 4 games"""
+    # Gaussian distribution centered at 4, with std deviation of 4
+    # This gives most users 0-8 games, with a long tail up to 25
+    total = int(random.gauss(4, 4))
     
-    distribution = random.random()
+    # Clamp to 0-25 range
+    total = max(0, min(25, total))
     
-    if distribution < 0.50:  # Casuals - tried it once or twice
+    # Determine skill level based on total games
+    if total <= 5:
         skill_level = 'casual'
-        total = random.choices([1, 2, 3, 4, 5], weights=[30, 25, 20, 15, 10])[0]
         win_rate = random.uniform(0.0, 0.6)  # Usually lose
-    elif distribution < 0.75:  # Regulars - play occasionally
+    elif total <= 15:
         skill_level = 'regular'
-        total = random.randint(6, 30)
         win_rate = random.uniform(0.3, 0.7)  # Mixed results
-    elif distribution < 0.90:  # Dedicated - play frequently
+    else:  # 16-25 games
         skill_level = 'dedicated'
-        total = random.randint(31, 100)
         win_rate = random.uniform(0.45, 0.75)  # Pretty good
-    else:  # Hardcore - this is their life
-        skill_level = 'hardcore'
-        total = random.randint(100, 500)
-        win_rate = random.uniform(0.55, 0.85)  # Very good
     
+    # Calculate wins, with cap at 17
     wins = int(total * win_rate)
+    wins = min(wins, 17)  # Cap at 17 wins maximum
+    
     losses = total - wins
     draws = 0
     
@@ -243,17 +241,11 @@ def choose_tech_stack(skill_level):
             ['none', 'trolly', 'casual', 'serious'],
             weights=[20, 25, 40, 15]
         )[0]
-    elif skill_level == 'dedicated':
-        # Dedicated: 5% no description, 15% trolly, 30% casual, 50% serious
+    else:  # dedicated (16-25 games)
+        # Dedicated: 5% no description, 10% trolly, 30% casual, 55% serious
         choice = random.choices(
             ['none', 'trolly', 'casual', 'serious'],
-            weights=[5, 15, 30, 50]
-        )[0]
-    else:  # hardcore
-        # Hardcore: 0% no description, 5% trolly, 20% casual, 75% serious
-        choice = random.choices(
-            ['none', 'trolly', 'casual', 'serious'],
-            weights=[0, 5, 20, 75]
+            weights=[5, 10, 30, 55]
         )[0]
     
     if choice == 'none':
@@ -335,15 +327,13 @@ def seed_fake_users(num_users=50):
         
         # Game count distribution
         casuals = db.query(User).filter(User.total_combats <= 5).count()
-        regulars = db.query(User).filter(User.total_combats > 5, User.total_combats <= 30).count()
-        dedicated = db.query(User).filter(User.total_combats > 30, User.total_combats <= 100).count()
-        hardcore = db.query(User).filter(User.total_combats > 100).count()
+        regulars = db.query(User).filter(User.total_combats > 5, User.total_combats <= 15).count()
+        dedicated = db.query(User).filter(User.total_combats > 15).count()
         
         print(f"\n🎮 Player activity distribution:")
         print(f"   🆕 Casuals (≤5 games): {casuals}")
-        print(f"   🎯 Regulars (6-30 games): {regulars}")
-        print(f"   💪 Dedicated (31-100 games): {dedicated}")
-        print(f"   🔥 Hardcore (100+ games): {hardcore}")
+        print(f"   🎯 Regulars (6-15 games): {regulars}")
+        print(f"   💪 Dedicated (16-25 games): {dedicated}")
         
         # Rank tiers
         bronze = db.query(User).filter(User.wins < 10).count()
