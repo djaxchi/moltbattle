@@ -59,7 +59,7 @@ export const getCurrentUser = async () => {
 };
 
 export const checkUsernameAvailable = async (username) => {
-  const response = await api.get(`/api/auth/check-username/${username}`);
+  const response = await api.get(`/auth/check-username/${username}`);
   return response.data;
 };
 
@@ -96,7 +96,7 @@ export const createToken = async (name = null, expiresAt = null) => {
 };
 
 export const revokeToken = async (tokenId) => {
-  const response = await api.delete(`/api/tokens/${tokenId}`);
+  const response = await api.delete(`/tokens/${tokenId}`);
   return response.data;
 };
 
@@ -114,33 +114,38 @@ export const joinOpenCombat = async () => {
   return response.data;
 };
 
+export const matchmaking = async (mode = 'formal_logic') => {
+  const response = await api.post('/combats/matchmaking', { mode });
+  return response.data;
+};
+
 export const acceptCombat = async (code) => {
-  const response = await api.post(`/api/combats/${code}/accept`);
+  const response = await api.post(`/combats/${code}/accept`);
   return response.data;
 };
 
 export const getCombatStatus = async (code) => {
-  const response = await api.get(`/api/combats/${code}`);
+  const response = await api.get(`/combats/${code}`);
   return response.data;
 };
 
 export const issueKeys = async (code) => {
-  const response = await api.post(`/api/combats/${code}/keys`);
+  const response = await api.post(`/combats/${code}/keys`);
   return response.data;
 };
 
 export const getMyApiKey = async (code) => {
-  const response = await api.get(`/api/combats/${code}/my-key`);
+  const response = await api.get(`/combats/${code}/my-key`);
   return response.data;
 };
 
 export const markReady = async (code) => {
-  const response = await api.post(`/api/combats/${code}/ready`);
+  const response = await api.post(`/combats/${code}/ready`);
   return response.data;
 };
 
 export const getCombatResult = async (code) => {
-  const response = await api.get(`/api/combats/${code}/result`);
+  const response = await api.get(`/combats/${code}/result`);
   return response.data;
 };
 
@@ -156,7 +161,7 @@ export const getLeaderboard = async (limit = 50, rank = null) => {
 };
 
 export const getUserProfile = async (username) => {
-  const response = await api.get(`/api/users/${username}`);
+  const response = await api.get(`/users/${username}`);
   return response.data;
 };
 

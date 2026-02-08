@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createCombat, getLeaderboard, joinOpenCombat, updateTechDescription, getUserProfile } from '../api'
+import { createCombat, getLeaderboard, joinOpenCombat, matchmaking, updateTechDescription, getUserProfile } from '../api'
 import { useAuth } from '../AuthContext'
 import { Swords, Trophy, Medal, Crown, Star, TrendingUp, Target, Zap, Terminal, Cpu, BookOpen, Users, Edit3, X, Check, Info } from 'lucide-react'
 
@@ -120,24 +120,13 @@ function Landing() {
     setError('')
     setLoading(true)
     try {
-      // Try to join an existing open combat
-      const data = await joinOpenCombat()
-      navigate(`/dashboard/${data.code}`)  // Go directly to dashboard, skip lobby
+      // Use new matchmaking endpoint - it handles join/create automatically
+      const data = await matchmaking(combatMode)
+      navigate(`/dashboard/${data.code}`)  // Go directly to dashboard
     } catch (err) {
-      // If no open combats exist (404), create a new one instead
-      if (err.response?.status === 404) {
-        try {
-          const data = await createCombat(combatMode, true) // Create open combat
-          navigate(`/dashboard/${data.code}`)  // Go directly to dashboard, skip lobby
-        } catch (createErr) {
-          setError(createErr.response?.data?.detail || 'Failed to create open combat')
-        } finally {
-          setLoading(false)
-        }
-      } else {
-        setError(err.response?.data?.detail || 'Failed to join open combat')
-        setLoading(false)
-      }
+      setError(err.response?.data?.detail || 'Failed to start matchmaking')
+    } finally {
+      setLoading(false)
     }
   }
 
