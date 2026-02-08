@@ -2366,7 +2366,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
 
 @app.get("/tournament/stats")
 async def get_tournament_stats(
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Get tournament signup statistics"""
@@ -2393,7 +2393,7 @@ async def get_tournament_stats(
 @app.post("/tournament/signup")
 async def tournament_signup(
     email: str,
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Sign up for the tournament"""
