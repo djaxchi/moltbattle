@@ -179,10 +179,12 @@ export const getTournamentStats = async () => {
   return response.data;
 };
 
-export const tournamentSignup = async (email) => {
-  const response = await api.post('/tournament/signup', null, {
-    params: { email }
-  });
+export const tournamentSignup = async (email = null, username = null) => {
+  const params = {};
+  if (email) params.email = email;
+  if (username) params.username = username;
+  
+  const response = await api.post('/tournament/signup', null, { params });
   return response.data;
 };
 

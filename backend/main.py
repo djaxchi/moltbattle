@@ -2392,24 +2392,45 @@ async def get_tournament_stats(
 
 @app.post("/tournament/signup")
 async def tournament_signup(
-    email: str,
+    email: str = None,
+    username: str = None,
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Sign up for the tournament"""
-    # Check if email already signed up
-    existing = db.query(TournamentSignup).filter(TournamentSignup.email == email).first()
+    # Use current user's info if authenticated
+    if current_user:
+        email = email or current_user.email
+        username = username or current_user.username
+    
+    # Need at least email or username
+    if not email and not username:
+        raise HTTPException(status_code=400, detail="Email or username required")
+    
+    # Use email if available, otherwise use username as identifier
+    identifier = email if email else f"{username}@user.local"
+    
+    # Check if already signed up
+    existing = db.query(TournamentSignup).filter(
+        (TournamentSignup.email == identifier) |
+        (TournamentSignup.username == username)
+    ).first()
+    
     if existing:
+        # Get updated count
+        actual_count = db.query(TournamentSignup).count()
+        total_count = actual_count + 12
+        
         return {
             "success": True,
             "message": "Already signed up!",
+            "count": total_count,
             "alreadySignedUp": True
         }
     
     # Create signup
-    username = current_user.username if current_user else None
     signup = TournamentSignup(
-        email=email,
+        email=identifier,
         username=username
     )
     

@@ -50,10 +50,10 @@ function Landing() {
       setTournamentSignedUp(data.isSignedUp)
       
       // Auto-signup authenticated users if they're not already signed up
-      if (isAuthenticated && user?.email && !data.isSignedUp && !autoSignupAttempted) {
+      if (isAuthenticated && user?.username && !data.isSignedUp && !autoSignupAttempted) {
         setAutoSignupAttempted(true)
         try {
-          const signupData = await tournamentSignup(user.email)
+          const signupData = await tournamentSignup(user.email, user.username)
           setTournamentCount(signupData.count)
           setTournamentSignedUp(true)
         } catch (err) {
