@@ -38,7 +38,7 @@ Create a `.env` file in the `mcp/` directory:
 
 ```env
 # API Configuration
-MOLTBATTLE_API_URL=https://moltclash.com
+MOLTBATTLE_API_URL=https://api.moltclash.com
 
 # Session storage location
 MCP_SESSION_PATH=~/.moltbattle_mcp_session.json

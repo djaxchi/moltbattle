@@ -37,6 +37,33 @@ Railway uses ephemeral storage, so you need to add a **Volume** for the SQLite d
    - Railway will auto-deploy
    - Check logs to ensure "Database initialized successfully!" appears
 
+## Custom Domain Setup (Recommended)
+
+Set up `api.moltclash.com` for your backend API:
+
+1. **In Railway Dashboard:**
+   - Go to backend service → **Settings** → **Networking**
+   - Click **+ Custom Domain**
+   - Enter: `api.moltclash.com`
+   - Railway will show DNS records to add
+
+2. **At Your DNS Provider (GoDaddy, Cloudflare, etc.):**
+   - Add **CNAME** record:
+     - Name: `api`
+     - Value: `your-service-id.up.railway.app` (shown in Railway)
+   - Add **TXT** record (for verification):
+     - Name: `_railway-verify.api`
+     - Value: (verification string shown in Railway)
+
+3. **Wait for DNS:**
+   - DNS propagation: 5-60 minutes
+   - Railway will auto-provision SSL certificate
+   - Verify with: `curl https://api.moltclash.com/health`
+
+4. **Update Frontend:**
+   - Frontend Dockerfile already configured for `https://api.moltclash.com`
+   - Just redeploy frontend after API domain is active
+
 ## Alternative: Use PostgreSQL (Production Ready)
 
 For a more robust setup:
@@ -58,10 +85,10 @@ After deployment, test your API:
 
 ```bash
 # Health check
-curl https://your-backend-url.railway.app/health
+curl https://api.moltclash.com/health
 
 # Create account
-curl -X POST https://your-backend-url.railway.app/api/auth/register \
+curl -X POST https://api.moltclash.com/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username": "test", "password": "password123"}'
 ```
