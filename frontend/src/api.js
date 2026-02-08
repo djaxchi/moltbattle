@@ -39,7 +39,7 @@ api.interceptors.response.use(
 // ============================================================================
 
 export const registerUserWithPassword = async (username, password, email = null, techDescription = null) => {
-  const response = await api.post('/api/auth/register', { 
+  const response = await api.post('/auth/register', { 
     username, 
     password,
     email,
@@ -49,12 +49,12 @@ export const registerUserWithPassword = async (username, password, email = null,
 };
 
 export const loginUser = async (username, password) => {
-  const response = await api.post('/api/auth/login', { username, password });
+  const response = await api.post('/auth/login', { username, password });
   return response.data;
 };
 
 export const getCurrentUser = async () => {
-  const response = await api.get('/api/auth/me');
+  const response = await api.get('/auth/me');
   return response.data;
 };
 
@@ -64,12 +64,12 @@ export const checkUsernameAvailable = async (username) => {
 };
 
 export const updateUsername = async (username) => {
-  const response = await api.put('/api/auth/username', { username });
+  const response = await api.put('/auth/username', { username });
   return response.data;
 };
 
 export const updatePassword = async (currentPassword, newPassword) => {
-  const response = await api.put('/api/auth/password', { 
+  const response = await api.put('/auth/password', { 
     current_password: currentPassword, 
     new_password: newPassword 
   });
@@ -77,7 +77,7 @@ export const updatePassword = async (currentPassword, newPassword) => {
 };
 
 export const updateTechDescription = async (techDescription) => {
-  const response = await api.put('/api/auth/tech-description', { tech_description: techDescription });
+  const response = await api.put('/auth/tech-description', { tech_description: techDescription });
   return response.data;
 };
 
@@ -86,12 +86,12 @@ export const updateTechDescription = async (techDescription) => {
 // ============================================================================
 
 export const listTokens = async () => {
-  const response = await api.get('/api/tokens');
+  const response = await api.get('/tokens');
   return response.data;
 };
 
 export const createToken = async (name = null, expiresAt = null) => {
-  const response = await api.post('/api/tokens', { name, expires_at: expiresAt });
+  const response = await api.post('/tokens', { name, expires_at: expiresAt });
   return response.data;
 };
 
@@ -105,12 +105,12 @@ export const revokeToken = async (tokenId) => {
 // ============================================================================
 
 export const createCombat = async (mode = 'formal_logic', isOpen = false) => {
-  const response = await api.post('/api/combats', { mode, is_open: isOpen });
+  const response = await api.post('/combats', { mode, is_open: isOpen });
   return response.data;
 };
 
 export const joinOpenCombat = async () => {
-  const response = await api.post('/api/combats/join-open');
+  const response = await api.post('/combats/join-open');
   return response.data;
 };
 
@@ -151,7 +151,7 @@ export const getCombatResult = async (code) => {
 export const getLeaderboard = async (limit = 50, rank = null) => {
   const params = { limit };
   if (rank) params.rank = rank;
-  const response = await api.get('/api/leaderboard', { params });
+  const response = await api.get('/leaderboard', { params });
   return response.data;
 };
 
@@ -161,7 +161,7 @@ export const getUserProfile = async (username) => {
 };
 
 export const getCombatHistory = async () => {
-  const response = await api.get('/api/users/me/history');
+  const response = await api.get('/users/me/history');
   return response.data;
 };
 

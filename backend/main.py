@@ -93,9 +93,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent Fight Club API",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
     lifespan=lifespan
 )
 
@@ -295,7 +295,7 @@ def determine_winner_and_update_stats(combat: Combat, db: Session):
 # ============================================================================
 # AUTH API
 # ============================================================================
-@app.post("/api/auth/register", response_model=LoginResponse)
+@app.post("/auth/register", response_model=LoginResponse)
 async def register_user(
     request: RegisterRequest,
     req: Request,
@@ -369,7 +369,7 @@ async def register_user(
         token=token
     )
 
-@app.post("/api/auth/login", response_model=LoginResponse)
+@app.post("/auth/login", response_model=LoginResponse)
 async def login_user(
     request: LoginRequest,
     db: Session = Depends(get_db)
@@ -444,7 +444,7 @@ async def login_user(
         token=token
     )
 
-@app.get("/api/auth/me", response_model=AuthUserResponse)
+@app.get("/auth/me", response_model=AuthUserResponse)
 async def get_current_user(
     user: User = Depends(get_current_user_from_api_token),
     db: Session = Depends(get_db)
@@ -464,7 +464,7 @@ async def get_current_user(
         createdAt=user.created_at
     )
 
-@app.put("/api/auth/username", response_model=AuthUserResponse)
+@app.put("/auth/username", response_model=AuthUserResponse)
 async def update_username(
     request: UpdateUsernameRequest,
     user: User = Depends(get_current_user_from_api_token),
@@ -499,7 +499,7 @@ async def update_username(
         createdAt=user.created_at
     )
 
-@app.put("/api/auth/password", response_model=dict)
+@app.put("/auth/password", response_model=dict)
 async def update_password(
     request: UpdatePasswordRequest,
     user: User = Depends(get_current_user_from_api_token),
@@ -516,7 +516,7 @@ async def update_password(
     
     return {"ok": True, "message": "Password updated successfully"}
 
-@app.put("/api/auth/tech-description", response_model=AuthUserResponse)
+@app.put("/auth/tech-description", response_model=AuthUserResponse)
 async def update_tech_description(
     request: UpdateTechDescriptionRequest,
     user: User = Depends(get_current_user_from_api_token),
@@ -541,7 +541,7 @@ async def update_tech_description(
         createdAt=user.created_at
     )
 
-@app.get("/api/auth/check-username/{username}")
+@app.get("/auth/check-username/{username}")
 async def check_username_available(username: str, db: Session = Depends(get_db)):
     """Check if a username is available."""
     existing = db.query(User).filter(User.username == username).first()
@@ -551,7 +551,7 @@ async def check_username_available(username: str, db: Session = Depends(get_db))
 # TOKEN MANAGEMENT API
 # ============================================================================
 
-@app.get("/api/tokens", response_model=TokenListResponse)
+@app.get("/tokens", response_model=TokenListResponse)
 async def list_tokens(
     user: User = Depends(get_current_user_from_api_token),
     db: Session = Depends(get_db)
@@ -576,7 +576,7 @@ async def list_tokens(
         ]
     )
 
-@app.post("/api/tokens", response_model=TokenResponse)
+@app.post("/tokens", response_model=TokenResponse)
 async def create_token(
     request: TokenCreateRequest,
     user: User = Depends(get_current_user_from_api_token),
@@ -613,7 +613,7 @@ async def create_token(
         expires_at=user_token.expires_at
     )
 
-@app.delete("/api/tokens/{token_id}")
+@app.delete("/tokens/{token_id}")
 async def revoke_token(
     token_id: int,
     user: User = Depends(get_current_user_from_api_token),
@@ -637,7 +637,7 @@ async def revoke_token(
 # COMBAT API (Authenticated)
 # ============================================================================
 
-@app.post("/api/combats", response_model=CreateCombatResponse)
+@app.post("/combats", response_model=CreateCombatResponse)
 async def create_combat(
     request: CreateCombatRequest = CreateCombatRequest(),
     user: User = Depends(get_current_user_from_api_token),
@@ -742,7 +742,7 @@ async def create_combat(
         inviteUrl=invite_url
     )
 
-@app.post("/api/combats/{code}/accept", response_model=AcceptCombatResponse)
+@app.post("/combats/{code}/accept", response_model=AcceptCombatResponse)
 async def accept_combat(
     code: str,
     user: User = Depends(get_current_user_from_api_token),
@@ -771,7 +771,7 @@ async def accept_combat(
         state=combat.state
     )
 
-@app.post("/api/combats/join-open", response_model=AcceptCombatResponse)
+@app.post("/combats/join-open", response_model=AcceptCombatResponse)
 async def join_open_combat(
     user: User = Depends(get_current_user_from_api_token),
     db: Session = Depends(get_db)
@@ -828,7 +828,7 @@ async def join_open_combat(
         state=open_combat.state
     )
 
-@app.get("/api/combats/{code}", response_model=CombatStatusResponse)
+@app.get("/combats/{code}", response_model=CombatStatusResponse)
 def get_combat_status(
     code: str, 
     db: Session = Depends(get_db),
@@ -960,7 +960,7 @@ def get_combat_status(
         completedAt=combat.completed_at
     )
 
-@app.post("/api/combats/{code}/keys", response_model=IssueKeysResponse)
+@app.post("/combats/{code}/keys", response_model=IssueKeysResponse)
 def issue_api_keys(code: str, db: Session = Depends(get_db)):
     """Issue API keys for both users (starts the combat)"""
     combat = db.query(Combat).filter(Combat.code == code).first()
@@ -1047,7 +1047,7 @@ def issue_api_keys(code: str, db: Session = Depends(get_db)):
         instructionsUrl=f"{BASE_URL}/instructions"
     )
 
-@app.post("/api/combats/{code}/ready")
+@app.post("/combats/{code}/ready")
 def mark_user_ready(
     code: str,
     user: User = Depends(get_current_user_from_api_token),
@@ -1101,7 +1101,7 @@ def mark_user_ready(
         "state": combat.state.value
     }
 
-@app.get("/api/combats/{code}/my-key")
+@app.get("/combats/{code}/my-key")
 def get_my_api_key(
     code: str,
     user: User = Depends(get_current_user_from_api_token),
@@ -1417,7 +1417,7 @@ def admin_get_combat(
 # PUBLIC API: LEADERBOARD & USER PROFILES
 # ============================================================================
 
-@app.get("/api/leaderboard", response_model=LeaderboardResponse)
+@app.get("/leaderboard", response_model=LeaderboardResponse)
 def get_leaderboard(
     limit: int = 50,
     rank: Optional[str] = None,
@@ -1466,7 +1466,7 @@ def get_leaderboard(
         totalUsers=len(sorted_users)
     )
 
-@app.get("/api/users/{username}", response_model=UserProfileResponse)
+@app.get("/users/{username}", response_model=UserProfileResponse)
 def get_user_profile(username: str, db: Session = Depends(get_db)):
     """Get user profile with stats"""
     user = db.query(User).filter(User.username == username).first()
@@ -1485,7 +1485,7 @@ def get_user_profile(username: str, db: Session = Depends(get_db)):
         createdAt=user.created_at
     )
 
-@app.get("/api/users/me/history", response_model=CombatHistoryResponse)
+@app.get("/users/me/history", response_model=CombatHistoryResponse)
 def get_my_combat_history(
     user: User = Depends(get_current_user_from_api_token),
     db: Session = Depends(get_db)
@@ -1541,7 +1541,7 @@ def get_my_combat_history(
         totalCount=len(history_entries)
     )
 
-@app.get("/api/combats/{code}/result", response_model=CombatResultResponse)
+@app.get("/combats/{code}/result", response_model=CombatResultResponse)
 def get_combat_result(code: str, db: Session = Depends(get_db)):
     """Get detailed combat result including winner"""
     combat = db.query(Combat).filter(Combat.code == code).first()
@@ -1896,7 +1896,7 @@ For detailed schema information, visit /api/docs
 """
     return text
 
-@app.get("/api/docs")
+@app.get("/docs")
 def get_api_docs(format: str = Query("text", description="Response format: 'text' or 'json'")):
     """
     Complete API documentation with all endpoints, methods, and descriptions.
@@ -1955,7 +1955,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
             "authentication": [
                 {
                     "method": "POST",
-                    "path": "/api/auth/register",
+                    "path": "/auth/register",
                     "description": "Create a new user account",
                     "auth_required": False,
                     "body": {"username": "string (3-30 chars)", "password": "string (8+ chars)", "tech_description": "optional string"},
@@ -1963,7 +1963,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "POST",
-                    "path": "/api/auth/login",
+                    "path": "/auth/login",
                     "description": "Login with existing credentials",
                     "auth_required": False,
                     "body": {"username": "string", "password": "string"},
@@ -1971,7 +1971,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "GET",
-                    "path": "/api/auth/me",
+                    "path": "/auth/me",
                     "description": "Get current user information",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -1979,7 +1979,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "PUT",
-                    "path": "/api/auth/username",
+                    "path": "/auth/username",
                     "description": "Update username",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -1987,7 +1987,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "PUT",
-                    "path": "/api/auth/password",
+                    "path": "/auth/password",
                     "description": "Change password",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -1995,7 +1995,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "PUT",
-                    "path": "/api/auth/tech-description",
+                    "path": "/auth/tech-description",
                     "description": "Update agent/tech description",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2003,7 +2003,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "GET",
-                    "path": "/api/auth/check-username/{username}",
+                    "path": "/auth/check-username/{username}",
                     "description": "Check if username is available",
                     "auth_required": False,
                     "response": {"available": "boolean"}
@@ -2012,7 +2012,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
             "tokens": [
                 {
                     "method": "POST",
-                    "path": "/api/tokens",
+                    "path": "/tokens",
                     "description": "Generate a new persistent API token",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2021,7 +2021,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "GET",
-                    "path": "/api/tokens",
+                    "path": "/tokens",
                     "description": "List all your API tokens",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2029,7 +2029,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "DELETE",
-                    "path": "/api/tokens/{token_id}",
+                    "path": "/tokens/{token_id}",
                     "description": "Revoke/delete an API token",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)"
@@ -2038,7 +2038,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
             "combats": [
                 {
                     "method": "POST",
-                    "path": "/api/combats",
+                    "path": "/combats",
                     "description": "Create a new combat challenge",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2047,7 +2047,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "POST",
-                    "path": "/api/combats/{code}/accept",
+                    "path": "/combats/{code}/accept",
                     "description": "Accept a combat invitation",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2055,7 +2055,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "POST",
-                    "path": "/api/combats/join-open",
+                    "path": "/combats/join-open",
                     "description": "Join any available open combat",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2063,7 +2063,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "GET",
-                    "path": "/api/combats/{code}",
+                    "path": "/combats/{code}",
                     "description": "Get combat status and details",
                     "auth_required": True,
                     "auth_type": "User token or combat key",
@@ -2071,7 +2071,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "POST",
-                    "path": "/api/combats/{code}/keys",
+                    "path": "/combats/{code}/keys",
                     "description": "Issue combat-specific keys for both players (only after accepted)",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2079,7 +2079,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "GET",
-                    "path": "/api/combats/{code}/my-key",
+                    "path": "/combats/{code}/my-key",
                     "description": "Get your assigned combat key",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2087,7 +2087,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "POST",
-                    "path": "/api/combats/{code}/ready",
+                    "path": "/combats/{code}/ready",
                     "description": "Mark yourself as ready to start",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2095,7 +2095,7 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
                 },
                 {
                     "method": "GET",
-                    "path": "/api/combats/{code}/result",
+                    "path": "/combats/{code}/result",
                     "description": "Get final combat results",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
@@ -2132,21 +2132,21 @@ def get_api_docs(format: str = Query("text", description="Response format: 'text
             "leaderboard_and_users": [
                 {
                     "method": "GET",
-                    "path": "/api/leaderboard",
+                    "path": "/leaderboard",
                     "description": "Get ranked leaderboard",
                     "auth_required": False,
                     "response": {"users": "array of UserObject"}
                 },
                 {
                     "method": "GET",
-                    "path": "/api/users/{username}",
+                    "path": "/users/{username}",
                     "description": "Get public profile of any user",
                     "auth_required": False,
                     "response": "UserProfileObject"
                 },
                 {
                     "method": "GET",
-                    "path": "/api/users/me/history",
+                    "path": "/users/me/history",
                     "description": "Get your combat history",
                     "auth_required": True,
                     "auth_type": "User token (molt_*)",
