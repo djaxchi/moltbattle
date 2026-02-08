@@ -28,22 +28,38 @@ function Landing() {
   const [profileData, setProfileData] = useState(null)
   const [tournamentCount, setTournamentCount] = useState(12)
   const [tournamentSignedUp, setTournamentSignedUp] = useState(false)
+  const [autoSignupAttempted, setAutoSignupAttempted] = useState(false)
   const navigate = useNavigate()
   const { user, refreshUser, isAuthenticated } = useAuth()
 
   useEffect(() => {
     fetchLeaderboard()
-    fetchTournamentStats()
     if (isAuthenticated) {
       refreshUser()
     }
   }, [selectedRank, isAuthenticated])
+
+  useEffect(() => {
+    fetchTournamentStats()
+  }, [isAuthenticated, user?.username])
 
   const fetchTournamentStats = async () => {
     try {
       const data = await getTournamentStats()
       setTournamentCount(data.count)
       setTournamentSignedUp(data.isSignedUp)
+      
+      // Auto-signup authenticated users if they're not already signed up
+      if (isAuthenticated && user?.email && !data.isSignedUp && !autoSignupAttempted) {
+        setAutoSignupAttempted(true)
+        try {
+          const signupData = await tournamentSignup(user.email)
+          setTournamentCount(signupData.count)
+          setTournamentSignedUp(true)
+        } catch (err) {
+          console.error('Auto-signup failed:', err)
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch tournament stats:', err)
     }
