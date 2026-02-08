@@ -28,7 +28,7 @@ from schemas import (
     TokenCreateRequest, TokenResponse, TokenListItem, TokenListResponse
 )
 from auth import generate_combat_code, generate_api_token, hash_token, hash_password, verify_password, generate_user_token
-from middleware import verify_admin_token, get_current_user_from_token, get_current_user_from_api_token
+from middleware import verify_admin_token, get_current_user_from_token, get_current_user_from_api_token, get_current_user_optional
 from rate_limiter import login_rate_limiter, register_rate_limiter, token_generation_rate_limiter
 from hf_datasets import question_service, verify_answer
 
@@ -831,9 +831,10 @@ async def join_open_combat(
 @app.get("/api/combats/{code}", response_model=CombatStatusResponse)
 def get_combat_status(
     code: str, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
 ):
-    """Get combat status (public endpoint)"""
+    """Get combat status (public, but shows extra info if authenticated)"""
     combat = db.query(Combat).filter(Combat.code == code).first()
     if not combat:
         raise HTTPException(status_code=404, detail="Combat not found")
@@ -841,49 +842,49 @@ def get_combat_status(
     user_a = db.query(User).filter(User.id == combat.user_a_id).first()
     user_b = db.query(User).filter(User.id == combat.user_b_id).first() if combat.user_b_id else None
     
-    # Combat status is now public - no auth needed
-    current_user = None
-    
     # Check for expiration - for online combats, check individual timers
     now = datetime.now(timezone.utc)
-    if combat.is_open and combat.state == CombatState.RUNNING:
-        # Check individual timers for online combats
+    if combat.is_open and combat.state == CombatState.RUNNING and combat.user_b_id:
+        # Only check individual timers once BOTH users are in the combat
         user_a_expired = combat.user_a_expires_at and now > ensure_aware(combat.user_a_expires_at)
         user_b_expired = combat.user_b_expires_at and now > ensure_aware(combat.user_b_expires_at)
         
-        # If both users have expired timers, mark combat as expired
-        if user_a_expired and (not combat.user_b_id or user_b_expired):
+        # Mark as expired only if BOTH users' individual timers have expired
+        if user_a_expired and user_b_expired:
             combat.state = CombatState.EXPIRED
             combat.completed_at = now
             db.commit()
             db.refresh(combat)
             determine_winner_and_update_stats(combat, db)
     elif combat.expires_at and now > ensure_aware(combat.expires_at):
-        # Traditional combat or OPEN state expiration
-        if combat.state == CombatState.RUNNING:
+        # 24-hour window expiration for OPEN state (no opponent joined)
+        # Or traditional combat expiration
+        if combat.state == CombatState.OPEN and combat.is_open and not combat.user_b_id:
+            # Open combat expired without opponent joining
+            combat.state = CombatState.EXPIRED
+            combat.completed_at = now
+            db.commit()
+        elif combat.state == CombatState.RUNNING and not combat.is_open:
+            # Traditional combat expired
             combat.state = CombatState.EXPIRED
             combat.completed_at = now
             db.commit()
             db.refresh(combat)
             determine_winner_and_update_stats(combat, db)
-        elif combat.state == CombatState.OPEN:
-            # Open combat expired without opponent - mark as expired
-            combat.state = CombatState.EXPIRED
-            combat.completed_at = now
-            db.commit()
     
     # Calculate countdown based on viewing user (for online combats)
     countdown_seconds = None
-    if combat.is_open and combat.state == CombatState.RUNNING and current_user:
-        # Online combat - use individual timer
-        if current_user.id == combat.user_a_id and combat.user_a_expires_at:
-            remaining = (ensure_aware(combat.user_a_expires_at) - now).total_seconds()
-            countdown_seconds = max(0, int(remaining))
-        elif current_user.id == combat.user_b_id and combat.user_b_expires_at:
-            remaining = (ensure_aware(combat.user_b_expires_at) - now).total_seconds()
-            countdown_seconds = max(0, int(remaining))
-    elif combat.expires_at:
-        # Traditional combat or fallback - use shared timer
+    if combat.is_open:
+        # Online combat - always use individual timers, never show 24-hour window
+        if current_user:
+            if current_user.id == combat.user_a_id and combat.user_a_expires_at:
+                remaining = (ensure_aware(combat.user_a_expires_at) - now).total_seconds()
+                countdown_seconds = max(0, int(remaining))
+            elif current_user.id == combat.user_b_id and combat.user_b_expires_at:
+                remaining = (ensure_aware(combat.user_b_expires_at) - now).total_seconds()
+                countdown_seconds = max(0, int(remaining))
+    elif combat.expires_at and combat.state not in [CombatState.COMPLETED, CombatState.EXPIRED]:
+        # Traditional combat - use shared timer
         remaining = (ensure_aware(combat.expires_at) - now).total_seconds()
         countdown_seconds = max(0, int(remaining))
     
@@ -916,10 +917,30 @@ def get_combat_status(
             if user:
                 submissions_status[user.username] = sub.status.value
         
+        # For users who haven't submitted, check if their timer has expired
         if combat.user_a_id and user_a.username not in submissions_status:
-            submissions_status[user_a.username] = "timeout"
+            # Check if user A's timer has expired
+            if combat.is_open and combat.user_a_expires_at:
+                user_a_expired = now > ensure_aware(combat.user_a_expires_at)
+                submissions_status[user_a.username] = "timeout" if user_a_expired else "thinking"
+            elif combat.expires_at:
+                # Legacy/traditional combat
+                combat_expired = now > ensure_aware(combat.expires_at)
+                submissions_status[user_a.username] = "timeout" if combat_expired else "thinking"
+            else:
+                submissions_status[user_a.username] = "thinking"
+                
         if combat.user_b_id and user_b and user_b.username not in submissions_status:
-            submissions_status[user_b.username] = "timeout"
+            # Check if user B's timer has expired
+            if combat.is_open and combat.user_b_expires_at:
+                user_b_expired = now > ensure_aware(combat.user_b_expires_at)
+                submissions_status[user_b.username] = "timeout" if user_b_expired else "thinking"
+            elif combat.expires_at:
+                # Legacy/traditional combat
+                combat_expired = now > ensure_aware(combat.expires_at)
+                submissions_status[user_b.username] = "timeout" if combat_expired else "thinking"
+            else:
+                submissions_status[user_b.username] = "thinking"
     
     return CombatStatusResponse(
         combatId=combat.id,

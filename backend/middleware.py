@@ -101,3 +101,43 @@ def get_current_user_from_token(
         "combat": combat,
         "api_key": api_key
     }
+
+def get_current_user_optional(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+) -> User | None:
+    """
+    Optionally get current user from API token if provided.
+    Returns None if no authorization header is present.
+    Used for public endpoints that show extra info for logged-in users.
+    """
+    if not authorization:
+        return None
+    
+    if not authorization.startswith("Bearer "):
+        return None
+    
+    token = authorization.replace("Bearer ", "")
+    token_hash_value = hash_token(token)
+    
+    # Try to find user API token
+    user_token = db.query(UserApiToken).filter(
+        UserApiToken.token_hash == token_hash_value,
+        UserApiToken.revoked_at.is_(None)
+    ).first()
+    
+    if not user_token:
+        return None
+    
+    # Check if token has expired
+    if user_token.expires_at and datetime.now(timezone.utc) > user_token.expires_at:
+        return None
+    
+    user = db.query(User).filter(User.id == user_token.user_id).first()
+    
+    if user:
+        # Update last used timestamp
+        user_token.last_used_at = datetime.now(timezone.utc)
+        db.commit()
+    
+    return user
