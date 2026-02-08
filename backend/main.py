@@ -16,7 +16,7 @@ from database import get_db
 from models import User, Combat, ApiKey, Question, Submission, CombatState, SubmissionStatus, CombatQuestion, TempApiKey, UserApiToken
 from schemas import (
     CreateCombatRequest, CreateCombatResponse,
-    AcceptCombatRequest, AcceptCombatResponse,
+    AcceptCombatRequest, AcceptCombatResponse, MatchmakingResponse,
     CombatStatusResponse, IssueKeysResponse,
     AgentMeResponse, AgentSubmitResponse, AgentResultResponse,
     SubmitAnswerRequest, HealthResponse,
@@ -826,6 +826,175 @@ async def join_open_combat(
         combatId=open_combat.id,
         code=open_combat.code,
         state=open_combat.state
+    )
+
+@app.post("/combats/matchmaking", response_model=MatchmakingResponse)
+async def auto_matchmaking(
+    request: CreateCombatRequest = CreateCombatRequest(),
+    user: User = Depends(get_current_user_from_api_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Automatic matchmaking: Try to join an open combat, or create one if none available.
+    Returns the combat details, API key, question, and time remaining - ready to play immediately.
+    """
+    
+    # Step 1: Try to join an existing open combat
+    now = datetime.now(timezone.utc)
+    open_combat = db.query(Combat).filter(
+        Combat.is_open == 1,
+        Combat.state.in_([CombatState.RUNNING, CombatState.OPEN]),
+        Combat.user_a_id != user.id,  # Can't join own combat
+        Combat.user_b_id == None,
+        Combat.expires_at > now
+    ).first()
+    
+    user_key = None
+    
+    if open_combat:
+        # Found an open combat - join it
+        open_combat.user_b_id = user.id
+        
+        # Generate API key for user B
+        token_b = generate_api_token()
+        user_key = token_b
+        api_key_b = ApiKey(
+            combat_id=open_combat.id,
+            user_id=user.id,
+            token_hash=hash_token(token_b)
+        )
+        db.add(api_key_b)
+        
+        # Update temp keys with user B's key
+        temp_keys = db.query(TempApiKey).filter(TempApiKey.combat_id == open_combat.id).first()
+        if temp_keys:
+            temp_keys.key_b = token_b
+        
+        # Set user B's individual timer
+        open_combat.state = CombatState.RUNNING
+        open_combat.accepted_at = now
+        open_combat.user_b_started_at = now
+        open_combat.user_b_expires_at = now + timedelta(seconds=TIME_LIMIT_SECONDS)
+        open_combat.expires_at = max(
+            ensure_aware(open_combat.user_a_expires_at) if open_combat.user_a_expires_at else now,
+            open_combat.user_b_expires_at
+        )
+        
+        db.commit()
+        
+        combat = open_combat
+        deadline = ensure_aware(open_combat.user_b_expires_at)
+        
+    else:
+        # Step 2: No open combat found - create a new one
+        mode = request.mode if request.mode in ["formal_logic", "argument_logic"] else "formal_logic"
+        
+        # Generate unique combat code
+        while True:
+            code = generate_combat_code()
+            existing = db.query(Combat).filter(Combat.code == code).first()
+            if not existing:
+                break
+        
+        combat_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        
+        combat = Combat(
+            id=combat_id,
+            code=code,
+            user_a_id=user.id,
+            state=CombatState.RUNNING,
+            question_mode=mode,
+            is_open=1,
+            started_at=now,
+            expires_at=now + timedelta(seconds=TIME_LIMIT_SECONDS),
+            user_a_started_at=now,
+            user_a_expires_at=now + timedelta(seconds=TIME_LIMIT_SECONDS)
+        )
+        db.add(combat)
+        
+        # Generate API key for user A
+        token_a = generate_api_token()
+        user_key = token_a
+        api_key_a = ApiKey(
+            combat_id=combat.id,
+            user_id=combat.user_a_id,
+            token_hash=hash_token(token_a)
+        )
+        db.add(api_key_a)
+        
+        # Fetch question
+        try:
+            combat_id_int = int(uuid.UUID(combat.id).int % (10**9))
+            normalized_question, answer_hash = question_service.create_combat_question(
+                combat_id=combat_id_int,
+                mode=mode
+            )
+            
+            combat_question = CombatQuestion(
+                combat_id=combat.id,
+                dataset=normalized_question.dataset,
+                config=normalized_question.config,
+                split=normalized_question.split,
+                row_offset=normalized_question.row_offset,
+                prompt=normalized_question.prompt,
+                choices_json=json.dumps(normalized_question.choices),
+                answer_key_hash=answer_hash
+            )
+            db.add(combat_question)
+            
+        except Exception as e:
+            print(f"HF question fetch failed: {e}, falling back to local questions")
+            questions = db.query(Question).all()
+            if not questions:
+                raise HTTPException(status_code=500, detail=f"No questions available: {str(e)}")
+            question = random.choice(questions)
+            combat.question_id = question.id
+        
+        # Store temporary plaintext key
+        temp_keys = TempApiKey(
+            combat_id=combat.id,
+            key_a=token_a,
+            key_b="",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+        )
+        db.add(temp_keys)
+        
+        db.commit()
+        
+        deadline = ensure_aware(combat.user_a_expires_at)
+    
+    # Fetch question for response
+    prompt = None
+    choices = None
+    
+    combat_question = db.query(CombatQuestion).filter(CombatQuestion.combat_id == combat.id).first()
+    if combat_question:
+        prompt = combat_question.prompt
+        choices = json.loads(combat_question.choices_json)
+    elif combat.question:
+        prompt = combat.question.prompt
+        try:
+            label_data = json.loads(combat.question.golden_label)
+            if isinstance(label_data, dict) and "choices" in label_data:
+                choices = label_data["choices"]
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    # Calculate time remaining
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    deadline_ts = int(deadline.timestamp()) if deadline else None
+    time_remaining = deadline_ts - now_ts if deadline_ts else None
+    
+    return MatchmakingResponse(
+        combatId=combat.id,
+        code=combat.code,
+        state=combat.state,
+        agentKey=user_key,
+        prompt=prompt,
+        choices=choices,
+        deadlineTs=deadline_ts,
+        timeRemaining=time_remaining
     )
 
 @app.get("/combats/{code}", response_model=CombatStatusResponse)

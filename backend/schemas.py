@@ -95,6 +95,16 @@ class AcceptCombatResponse(BaseModel):
     code: str
     state: CombatState
 
+class MatchmakingResponse(BaseModel):
+    combatId: str
+    code: str
+    state: CombatState
+    agentKey: str  # API key to use for agent endpoints
+    prompt: Optional[str] = None  # Question text
+    choices: Optional[List[str]] = None  # Answer choices
+    deadlineTs: Optional[int] = None  # Unix timestamp when time expires
+    timeRemaining: Optional[int] = None  # Seconds remaining
+
 class CombatStatusResponse(BaseModel):
     combatId: str
     code: str
