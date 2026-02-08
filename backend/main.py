@@ -1520,6 +1520,51 @@ def admin_seed_questions(
     seed_questions()
     return {"message": "Questions seeded successfully"}
 
+@app.post("/admin/seed-fake-users")
+def admin_seed_fake_users(
+    count: int = 50,
+    admin: bool = Depends(verify_admin_token),
+    db: Session = Depends(get_db)
+):
+    """
+    ONE-TIME USE ONLY: Seed database with fake users for marketing.
+    
+    ⚠️ TEMPORARY ENDPOINT - Remove after initial database seeding!
+    
+    Query params:
+    - count: Number of users to create (default: 50)
+    
+    Usage:
+    curl -X POST "https://api.moltclash.com/admin/seed-fake-users?count=50" \
+      -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+    """
+    try:
+        from seed_test import seed_fake_users as run_seed
+        
+        # Capture output
+        import io
+        import sys
+        
+        old_stdout = sys.stdout
+        sys.stdout = buffer = io.StringIO()
+        
+        try:
+            run_seed(count)
+            output = buffer.getvalue()
+        finally:
+            sys.stdout = old_stdout
+        
+        return {
+            "success": True,
+            "message": f"Seeded {count} fake users successfully",
+            "output": output
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Seeding failed: {str(e)}"
+        )
+
 @app.get("/admin/questions", response_model=List[QuestionResponse])
 def admin_list_questions(
     admin: bool = Depends(verify_admin_token),
