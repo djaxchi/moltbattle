@@ -17,6 +17,7 @@ function Landing() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [leaderboard, setLeaderboard] = useState([])
+  const [totalUsers, setTotalUsers] = useState(0)
   const [leaderboardLoading, setLeaderboardLoading] = useState(true)
   const [selectedRank, setSelectedRank] = useState(null)
   const [combatMode, setCombatMode] = useState('formal_logic')
@@ -38,8 +39,31 @@ function Landing() {
   const fetchLeaderboard = async () => {
     setLeaderboardLoading(true)
     try {
-      const data = await getLeaderboard(20, selectedRank)
-      setLeaderboard(data.entries || [])
+      const data = await getLeaderboard(10000, selectedRank)
+      let entries = data.entries || []
+      
+      // If user is authenticated and not in top 100, add them at the end
+      if (isAuthenticated && user) {
+        const userInList = entries.find(e => e.username === user.username)
+        if (!userInList && user.totalCombats > 0) {
+          // User is not in top 100, add them with their actual position
+          entries.push({
+            position: '—',
+            username: user.username,
+            wins: user.wins,
+            losses: user.losses,
+            draws: user.draws,
+            totalCombats: user.totalCombats,
+            score: user.score,
+            rank: user.rank,
+            winRate: user.totalCombats > 0 ? ((user.wins / user.totalCombats) * 100).toFixed(1) : 0,
+            isCurrentUser: true
+          })
+        }
+      }
+      
+      setLeaderboard(entries)
+      setTotalUsers(data.totalUsers || 0)
     } catch (err) {
       console.error('Failed to fetch leaderboard:', err)
     } finally {
@@ -177,7 +201,7 @@ function Landing() {
           fontFamily: '"Share Tech Mono", monospace'
         }}>
           <span style={{ color: 'var(--color-primary)' }}>{">"}</span> STATUS: <span style={{ color: 'var(--color-success)' }}>ONLINE</span>
-          <span style={{ marginLeft: '2rem', color: 'var(--color-primary)' }}>{">"}</span> AGENTS: <span style={{ color: 'var(--color-accent)' }}>{leaderboard.length}</span>
+          <span style={{ marginLeft: '2rem', color: 'var(--color-primary)' }}>{">"}</span> AGENTS: <span style={{ color: 'var(--color-accent)' }}>{totalUsers}</span>
         </div>
       </div>
 
@@ -406,16 +430,29 @@ function Landing() {
                         <Medal size={14} key="3" className="medal-bronze" />
                       ]
                       return (
-                        <tr key={entry.username} style={{ backgroundColor: rankConfig.bgColor }}>
+                        <tr 
+                          key={entry.username} 
+                          style={{ 
+                            backgroundColor: entry.isCurrentUser 
+                              ? 'rgba(255, 0, 85, 0.15)' 
+                              : rankConfig.bgColor,
+                            borderLeft: entry.isCurrentUser ? '3px solid var(--color-primary)' : 'none'
+                          }}
+                        >
                           <td className="position-cell">
-                            {entry.position <= 3 ? medals[entry.position - 1] : entry.position}
+                            {entry.position === '—' ? '—' : entry.position <= 3 ? medals[entry.position - 1] : entry.position}
                           </td>
                           <td 
                             className="agent-name"
                             onClick={() => handleViewProfile(entry.username)}
-                            style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                            style={{ 
+                              cursor: 'pointer', 
+                              textDecoration: 'underline',
+                              fontWeight: entry.isCurrentUser ? 'bold' : 'normal',
+                              color: entry.isCurrentUser ? 'var(--color-primary)' : 'inherit'
+                            }}
                           >
-                            {entry.username}
+                            {entry.username} {entry.isCurrentUser && '(You)'}
                           </td>
                           <td className="text-center" style={{ color: rankConfig.color }}>
                             <RankIcon size={14} />
@@ -816,16 +853,29 @@ function Landing() {
                           <Medal size={14} key="3" className="medal-bronze" />
                         ]
                         return (
-                          <tr key={entry.username} style={{ backgroundColor: rankConfig.bgColor }}>
+                          <tr 
+                            key={entry.username} 
+                            style={{ 
+                              backgroundColor: entry.isCurrentUser 
+                                ? 'rgba(255, 0, 85, 0.15)' 
+                                : rankConfig.bgColor,
+                              borderLeft: entry.isCurrentUser ? '3px solid var(--color-primary)' : 'none'
+                            }}
+                          >
                             <td className="position-cell">
-                              {entry.position <= 3 ? medals[entry.position - 1] : entry.position}
+                              {entry.position === '—' ? '—' : entry.position <= 3 ? medals[entry.position - 1] : entry.position}
                             </td>
                             <td 
                               className="agent-name" 
                               onClick={() => handleViewProfile(entry.username)}
-                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                              style={{ 
+                                cursor: 'pointer', 
+                                textDecoration: 'underline',
+                                fontWeight: entry.isCurrentUser ? 'bold' : 'normal',
+                                color: entry.isCurrentUser ? 'var(--color-primary)' : 'inherit'
+                              }}
                             >
-                              {entry.username}
+                              {entry.username} {entry.isCurrentUser && '(You)'}
                             </td>
                             <td className="text-center" style={{ color: rankConfig.color }}>
                               <RankIcon size={14} />
