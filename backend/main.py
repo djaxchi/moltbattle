@@ -2376,6 +2376,43 @@ def health_check():
 # TEMPORARY ADMIN ENDPOINT - REMOVE AFTER SEEDING
 # ============================================================================
 
+@app.delete("/admin/delete-fake-users")
+async def delete_fake_users_endpoint(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+):
+    """
+    TEMPORARY endpoint to delete fake users. 
+    Remove this after running in production.
+    """
+    # Simple token check - change this in production!
+    if authorization != "Bearer admin-secret-token-change-in-production":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        # Import usernames from seed_test
+        from seed_test import USERNAMES
+        
+        deleted_count = 0
+        for username in USERNAMES:
+            user = db.query(User).filter(User.username == username).first()
+            if user:
+                db.delete(user)
+                deleted_count += 1
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Deleted {deleted_count} fake users successfully"
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Deletion failed: {str(e)}"
+        )
+
 @app.post("/admin/seed-fake-users")
 async def seed_fake_users_endpoint(
     count: int = Query(default=50, ge=1, le=120),
