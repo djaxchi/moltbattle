@@ -2510,6 +2510,35 @@ async def seed_fake_users_endpoint(
             detail=f"Seeding failed: {str(e)}"
         )
 
+@app.post("/admin/create-tournament-table")
+async def create_tournament_table_endpoint(
+    authorization: str = Header(None)
+):
+    """
+    TEMPORARY endpoint to create tournament_signups table. 
+    Remove this after running in production.
+    """
+    # Simple token check
+    if authorization != "Bearer admin-secret-token-change-in-production":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    try:
+        from models import Base
+        from database import engine
+        
+        # Create only the tournament_signups table
+        TournamentSignup.__table__.create(engine, checkfirst=True)
+        
+        return {
+            "success": True,
+            "message": "Tournament table created successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Table creation failed: {str(e)}"
+        )
+
 # ============================================================================
 # BACKGROUND TASK: Check for expired combats
 # ============================================================================
